@@ -59,7 +59,7 @@ Write-Host "Profile: $Profile   API: $ApiUrl   Dev sign-in: $($env:EXPO_PUBLIC_D
 
 # The bundler caches compiled code without the EXPO_PUBLIC_* values, so a build could keep another profile's API address
 # or developer sign-in. Always start from an empty cache.
-Remove-Item -Recurse -Force (Join-Path $env:TEMP "metro-cache"), (Join-Path $root "node_modules\.cache"), (Join-Path $root "androidppuild\generatedssets") -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force (Join-Path $env:TEMP "metro-cache"), (Join-Path $root "node_modules\.cache"), (Join-Path $root "android\app\build\generated\assets") -ErrorAction SilentlyContinue
 Get-ChildItem $env:TEMP -Directory -Filter "metro-*" -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 
 npx expo prebuild --platform android --no-install
