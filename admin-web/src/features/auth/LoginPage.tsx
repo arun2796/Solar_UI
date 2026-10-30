@@ -76,7 +76,7 @@ export default function LoginPage() {
         <Field label="Password" error={errors.password?.message}><Input type="password" autoComplete="current-password" {...register('password')} /></Field>
         <Button type="submit" variant="primary" loading={isSubmitting} className="w-full justify-center">Sign in</Button>
         <button type="button" onClick={() => setShowForgot(v => !v)} className="text-xs text-sky-700 hover:underline">Forgot password?</button>
-        {showForgot && <p className="rounded bg-slate-50 p-2 text-xs text-slate-600">Password reset for admins is managed by database access in development, or contact your team lead.</p>}
+        {showForgot && <p className="rounded bg-slate-50 p-2 text-xs text-slate-600">Administrator passwords are reset by whoever runs the server, with the API's create-admin command. Engineers: ask an administrator to reset yours.</p>}
       </form>
     </div>
   </div>

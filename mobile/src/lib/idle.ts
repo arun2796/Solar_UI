@@ -1,16 +1,17 @@
 import { AppState, type AppStateStatus } from 'react-native'
-import { authStore, signOut } from './auth'
+import { authStore, IDLE_TIMEOUT_MS, markActive, signOut } from './auth'
 import { flushActiveDraft } from '../forms/useDraft'
 
-/** Configurable idle timeout (default: 15 minutes of inactivity) */
-export const IDLE_TIMEOUT_MS = 15 * 60 * 1000
+export { IDLE_TIMEOUT_MS }
 
 let lastActivityTime = Date.now()
+let lastPersisted = 0
 let idleTimer: ReturnType<typeof setTimeout> | null = null
 
 /** Call whenever the user touches, taps, navigates, or types. */
 export function recordUserActivity() {
   lastActivityTime = Date.now()
+  if (lastActivityTime - lastPersisted > 30_000) { lastPersisted = lastActivityTime; markActive(lastActivityTime) }   // survives an app restart
   if (idleTimer) clearTimeout(idleTimer)
   if (authStore.get().status === 'in') {
     idleTimer = setTimeout(() => {
@@ -49,6 +50,7 @@ export function initIdleTracker() {
       }
     } else {
       // App moving to background: immediately save active draft as precaution
+      markActive(lastActivityTime)
       void flushActiveDraft()
     }
   }

@@ -53,7 +53,12 @@ export function clearSession() {
   notify()
 }
 
-export const logout = clearSession
+/** Signs out this browser and revokes the refresh token at the API (best effort: offline, it simply expires). */
+export async function logout() {
+  const s = read()
+  clearSession()
+  if (s) await axios.post(`${API_URL}/auth/logout`, { refreshToken: s.refreshToken }, { timeout: 10_000 }).catch(() => { /* token simply expires */ })
+}
 
 const fresh = (s: Session) => new Date(s.accessTokenExpiresAt).getTime() > Date.now() + SKEW_MS
 
@@ -69,9 +74,12 @@ export function refresh(): Promise<string | null> {
       const r = await axios.post<AuthResponse>(`${API_URL}/auth/refresh`, { refreshToken: before }, { timeout: 30_000 })
       setSession({ ...r.data, dev: s.dev })
       return r.data.accessToken
-    } catch {
-      clearSession()
-      return null
+    } catch (e) {
+      if (axios.isAxiosError(e) && (e.response?.status === 401 || e.response?.status === 400)) {
+        if (read()?.refreshToken === before) clearSession()
+        return null
+      }
+      throw e // network error or the API is still starting: keep the session, the caller shows "API unreachable"
     }
   })().finally(() => { inFlight = null })
   return inFlight
