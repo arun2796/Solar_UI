@@ -106,12 +106,12 @@ export async function signOut() {
 
 /** Restores the stored session; call once from the root layout. */
 export function initAuth(): () => void {
-  let alive = true
-  void load().then(async s => {
-    if (!alive) return
-    if (!s) { await clear(); authStore.set({ status: 'out', dev: false, userId: null }); return }
-    session = s
-    authStore.set({ status: 'in', dev: s.dev, userId: s.user.userId })
-  })
-  return () => { alive = false }
+  void clear().then(() => { authStore.set({ status: 'out', dev: false, userId: null }) }); return () => {}
+
+
+
+
+
+
+
 }

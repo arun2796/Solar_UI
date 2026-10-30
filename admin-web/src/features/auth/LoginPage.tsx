@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Sun, Zap } from 'lucide-react'
+import { Zap } from 'lucide-react'
 import { api, errorMessage, startSession, statusOf } from '../../lib/api'
 import { DEV_LOGIN_ENABLED } from '../../lib/devAuth'
 import { Button, Field, Input, Notice } from '../../components/ui'
@@ -28,7 +28,7 @@ export default function LoginPage() {
   const onSubmit = async (f: Form) => {
     setError(null)
     try {
-      startSession(await api.auth.login(f.email.trim(), f.password))   // replaces any previous user's session and cached data
+      startSession(await api.auth.login(f.email.trim(), f.password)) // replaces any previous user's session and cached data
       navigate(from, { replace: true })
     } catch (e) {
       const s = statusOf(e)
@@ -47,10 +47,20 @@ export default function LoginPage() {
 
   return <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-sky-100 via-sky-50 to-slate-100 p-4">
     <div className="w-full max-w-sm">
-      <div className="mb-4 flex items-center gap-3 rounded-xl bg-gradient-to-br from-sky-600 to-sky-800 p-5 text-white shadow-md">
-        <div className="rounded-full bg-white/20 p-2"><Sun className="h-7 w-7" /></div>
-        <div><h1 className="text-xl font-semibold">Solar Maintenance</h1><p className="text-sm text-sky-100">Shree Abhi Electricals · Administrator</p></div>
+      <div className="mb-4 rounded-xl border border-slate-200 bg-white p-5 shadow-md">
+        <div className="flex justify-center">
+          <img
+            src="/company-logo.png"
+            alt="Shree Abhi Electricals & Engineering Pvt. Ltd."
+            className="h-14 w-auto object-contain"
+          />
+        </div>
+        <div className="mt-3 border-t border-slate-100 pt-3 text-center">
+          <h1 className="text-lg font-bold text-slate-800">Solar Maintenance System</h1>
+          <p className="text-xs font-medium text-slate-500">Shree Abhi Electricals & Engineering Pvt. Ltd. · Admin</p>
+        </div>
       </div>
+      {sp.get('reason') === 'idle' && <Notice tone="info" className="mb-4">You were signed out due to 15 minutes of inactivity. Please sign in again.</Notice>}
       {DEV_LOGIN_ENABLED && <div className="mb-4 rounded-xl border-2 border-sky-600 bg-white p-4 shadow-sm">
         <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-sky-900"><Zap className="h-4 w-4" />Quick sign-in (local test setup)</div>
         {devUsers.isLoading ? <p className="text-sm text-sky-800">Loading users…</p>
@@ -59,16 +69,14 @@ export default function LoginPage() {
           : <div className="space-y-2">{devUsers.data.map(u => <Button key={u.userId} type="button" variant="primary" loading={devBusy === u.userId} onClick={() => devLogin(u.userId)} className="w-full justify-center">
               Sign in as {u.email ?? u.userId.slice(0, 8)}</Button>)}</div>}
       </div>}
-      <form onSubmit={handleSubmit(onSubmit)} className="rounded-xl border border-slate-200 bg-white p-6 shadow-md" noValidate>
-        {DEV_LOGIN_ENABLED && <p className="mb-4 text-center text-xs uppercase tracking-wide text-slate-400">or sign in with email and password</p>}
-        <div className="space-y-3">
-          <Field label="Email" error={errors.email?.message}><Input type="email" autoComplete="username" {...register('email')} /></Field>
-          <Field label="Password" error={errors.password?.message}><Input type="password" autoComplete="current-password" {...register('password')} /></Field>
-        </div>
-        {error && <Notice className="mt-3">{error}</Notice>}
-        <Button type="submit" loading={isSubmitting} className="mt-5 w-full justify-center">Sign in</Button>
-        <button type="button" onClick={() => setShowForgot(v => !v)} className="mt-3 w-full text-center text-sm text-slate-500 hover:text-slate-800">Forgot password?</button>
-        {showForgot && <Notice tone="info" className="mt-2">Administrator passwords are reset by whoever runs the server, with the API's create-admin command. Engineers: ask an administrator to reset yours.</Notice>}
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 className="text-base font-semibold text-slate-900">Sign in with email</h2>
+        {error && <Notice tone="error">{error}</Notice>}
+        <Field label="Email" error={errors.email?.message}><Input type="email" autoComplete="email" {...register('email')} /></Field>
+        <Field label="Password" error={errors.password?.message}><Input type="password" autoComplete="current-password" {...register('password')} /></Field>
+        <Button type="submit" variant="primary" loading={isSubmitting} className="w-full justify-center">Sign in</Button>
+        <button type="button" onClick={() => setShowForgot(v => !v)} className="text-xs text-sky-700 hover:underline">Forgot password?</button>
+        {showForgot && <p className="rounded bg-slate-50 p-2 text-xs text-slate-600">Password reset for admins is managed by database access in development, or contact your team lead.</p>}
       </form>
     </div>
   </div>

@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type TextInputProps, type ViewStyle } from 'react-native'
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type LayoutChangeEvent, type TextInputProps, type ViewStyle } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useHeaderHeight } from 'expo-router/react-navigation'
 import { colors, font, space, touch } from '../theme'
@@ -10,11 +10,13 @@ import type { DraftSyncState } from '../db'
 function useSafeHeaderHeight() { try { return useHeaderHeight() } catch { return 0 } }
 
 /** Screen with keyboard avoidance (so remarks and date fields are not hidden by the keyboard) and an optional sticky footer. */
-export function Screen({ children, scroll = true, padded = true, footer, scrollEnabled = true }: { children: ReactNode; scroll?: boolean; padded?: boolean; footer?: ReactNode; scrollEnabled?: boolean }) {
+export function Screen({ children, scroll = true, padded = true, footer, scrollEnabled = true, scrollRef }: {
+  children: ReactNode; scroll?: boolean; padded?: boolean; footer?: ReactNode; scrollEnabled?: boolean; scrollRef?: React.RefObject<any>
+}) {
   const insets = useSafeAreaInsets()
   const headerHeight = useSafeHeaderHeight()
   const body = scroll
-    ? <ScrollView contentContainerStyle={[padded && s.pad, { paddingBottom: space.xl }]} keyboardShouldPersistTaps="handled" scrollEnabled={scrollEnabled}>{children}</ScrollView>
+    ? <ScrollView ref={scrollRef as never} contentContainerStyle={[padded && s.pad, { paddingBottom: space.xl }]} keyboardShouldPersistTaps="handled" scrollEnabled={scrollEnabled}>{children}</ScrollView>
     : <View style={[{ flex: 1 }, padded && s.pad]}>{children}</View>
   return <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={headerHeight}>
     <ConnectionBanner />{body}
@@ -41,8 +43,22 @@ export function Button({ title, onPress, variant = 'primary', disabled, loading,
     {loading ? <ActivityIndicator color={fg} /> : <Text style={{ color: fg, fontSize: font.base, fontWeight: '700', textAlign: 'center' }}>{title}</Text>}</Pressable>
 }
 
-export function Field({ label, children, error, hint }: { label: string; children: ReactNode; error?: string; hint?: string }) {
-  return <View style={{ marginBottom: space.lg }}><Text style={s.label}>{label}</Text>{children}{hint && !error && <Text style={s.hint}>{hint}</Text>}{error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}</View>
+export function Field({ label, children, error, hint, style, onLayout }: { label: string; children: ReactNode; error?: string; hint?: string; style?: ViewStyle; onLayout?: (e: LayoutChangeEvent) => void }) {
+  return (
+    <View
+      onLayout={onLayout}
+      style={[
+        { marginBottom: space.lg },
+        error ? { borderWidth: 2, borderColor: colors.danger, borderRadius: 10, padding: space.sm, backgroundColor: colors.defectSoft } : null,
+        style,
+      ]}
+    >
+      <Text style={[s.label, error ? { color: colors.danger, fontWeight: '800' } : null]}>{label}</Text>
+      {children}
+      {hint && !error && <Text style={s.hint}>{hint}</Text>}
+      {error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
+    </View>
+  )
 }
 export function Input(p: TextInputProps) {
   return <TextInput placeholderTextColor="#64748B" {...p} style={[s.input, p.multiline && { minHeight: 90, textAlignVertical: 'top' }, p.editable === false && { backgroundColor: colors.surface, color: colors.muted }, p.style]} />
@@ -105,12 +121,20 @@ export function StateBadge({ state }: { state: DraftSyncState }) {
   return <View style={{ backgroundColor: bg, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 }}><Text style={{ color: fg, fontSize: 14, fontWeight: '800' }}>{t}</Text></View>
 }
 
-/** Section progress: numbered steps, ✓ when complete. */
-/** Section progress; with onSelect each step is a button that jumps to that section. */
-export function Progress({ done, current, onSelect }: { done: boolean[]; current?: number; onSelect?: (n: number) => void }) {
+/** Section progress: numbered steps, ✓ when complete. With incomplete array, highlights incomplete sections in red tone. */
+export function Progress({ done, current, onSelect, incomplete }: { done: boolean[]; current?: number; onSelect?: (n: number) => void; incomplete?: boolean[] }) {
   return <View style={{ flexDirection: 'row', gap: 4, marginBottom: space.md }} accessibilityLabel={`${done.filter(Boolean).length} of ${done.length} sections complete`}>
-    {done.map((ok, i) => <Pressable key={i} disabled={!onSelect || current === i + 1} onPress={() => onSelect?.(i + 1)} accessibilityRole={onSelect ? 'button' : undefined} accessibilityLabel={`Section ${i + 1}${ok ? ', complete' : ''}`} hitSlop={6} style={{ flex: 1, height: 36, borderRadius: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: ok ? colors.good : current === i + 1 ? colors.primary : colors.surface, borderWidth: 1, borderColor: ok ? colors.good : current === i + 1 ? colors.primary : colors.border }}>
-      <Text style={{ fontSize: 14, fontWeight: '800', color: ok || current === i + 1 ? '#fff' : colors.muted }}>{ok ? '✓' : i + 1}</Text></Pressable>)}
+    {done.map((ok, i) => {
+      const isCur = current === i + 1
+      const isBad = incomplete ? incomplete[i] : (!ok && current !== undefined && current !== i + 1)
+      const bg = ok ? colors.good : isCur ? colors.primary : isBad ? colors.defectSoft : colors.surface
+      const border = ok ? colors.good : isCur ? colors.primary : isBad ? colors.danger : colors.border
+      const fg = ok || isCur ? '#fff' : isBad ? colors.danger : colors.muted
+      return <Pressable key={i} disabled={!onSelect || isCur} onPress={() => onSelect?.(i + 1)}
+        accessibilityRole={onSelect ? 'button' : undefined} accessibilityLabel={`Section ${i + 1}${ok ? ', complete' : isBad ? ', incomplete' : ''}`} hitSlop={6}
+        style={{ flex: 1, height: 36, borderRadius: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: bg, borderWidth: isBad ? 2 : 1, borderColor: border }}>
+        <Text style={{ fontSize: 13, fontWeight: '800', color: fg }}>{ok ? '✓' : `${i + 1}${isBad ? '!' : ''}`}</Text></Pressable>
+    })}
   </View>
 }
 
