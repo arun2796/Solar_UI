@@ -57,6 +57,11 @@ $env:EXPO_PUBLIC_API_URL = $ApiUrl
 $env:NODE_ENV = "production"
 Write-Host "Profile: $Profile   API: $ApiUrl   Dev sign-in: $($env:EXPO_PUBLIC_DEV_LOGIN)"
 
+# The bundler caches compiled code without the EXPO_PUBLIC_* values, so a build could keep another profile's API address
+# or developer sign-in. Always start from an empty cache.
+Remove-Item -Recurse -Force (Join-Path $env:TEMP "metro-cache"), (Join-Path $root "node_modules\.cache"), (Join-Path $root "androidppuild\generatedssets") -ErrorAction SilentlyContinue
+Get-ChildItem $env:TEMP -Directory -Filter "metro-*" -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+
 npx expo prebuild --platform android --no-install
 if ($LASTEXITCODE -ne 0) { throw "expo prebuild failed" }
 
@@ -85,6 +90,7 @@ if ($Profile -eq "production") {
   foreach ($bad in @("192.168.", "10.0.2.2", "localhost:5000", "127.0.0.1")) {
     if ($text.Contains($bad)) { throw "Verification failed: the production bundle contains a development address ($bad)" }
   }
+  if ($text.Contains("Quick sign-in")) { throw "Verification failed: the production bundle contains the developer quick sign-in" }
 }
 Write-Host "Verified: bundle uses $ApiUrl"
 
