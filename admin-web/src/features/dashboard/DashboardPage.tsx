@@ -54,7 +54,7 @@ export default function DashboardPage() {
           : todays.data!.filter(a => a.status !== 'cancelled').length === 0 ? <EmptyState text="No visits assigned for today." />
           : <ul className="divide-y divide-slate-100">{todays.data!.filter(a => a.status !== 'cancelled').map(a =>
             <li key={a.id}><button type="button" onClick={() => nav(`/clients/${a.clientId}`)} className="flex w-full items-center gap-3 rounded-md px-2 py-2.5 text-left hover:bg-sky-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400">
-              <span className="w-12 shrink-0 text-sm font-semibold tabular-nums text-slate-700">{a.scheduledTime ?? '—'}</span>
+              <span className="w-12 shrink-0 text-sm font-semibold tabular-nums text-slate-700">{a.scheduledTime?.slice(0, 5) ?? '—'}</span>
               <span className="min-w-0 flex-1"><span className="block truncate font-medium text-slate-900">{a.clientName}</span>
                 <span className="block truncate text-xs text-slate-500">{a.engineerName}{a.siteLocation ? ` · ${a.siteLocation}` : ''}</span></span>
               <Badge tone={a.status === 'completed' ? 'green' : 'blue'}>{a.status === 'completed' ? 'done' : 'scheduled'}</Badge></button></li>)}</ul>}
