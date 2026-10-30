@@ -10,7 +10,7 @@ import { Button, Field, Input, Loading, NotFound, Screen } from '../../../../com
 import { colors, font, space } from '../../../../theme'
 
 export default function Signatures() {
-  const { localId } = useLocalSearchParams<{ localId: string }>()
+  const { localId, check } = useLocalSearchParams<{ localId: string; check?: string }>()
   const router = useRouter()
   const scrollRef = useRef<any>(null)
   const fieldPositions = useRef<Record<string, number>>({})
@@ -21,9 +21,9 @@ export default function Signatures() {
   if (loading) return <Screen><Loading /></Screen>
   if (!draft || !fields) return <NotFound onBack={() => router.replace('/(app)')} />
 
-  const engineerMissing = !locked && !draft.engineerSigUri
-  const repNameMissing = !locked && !fields.clientRepName?.trim()
-  const clientSigMissing = !locked && !draft.clientSigUri
+  const engineerMissing = check === '1' && !locked && !draft.engineerSigUri
+  const repNameMissing = check === '1' && !locked && !fields.clientRepName?.trim()
+  const clientSigMissing = check === '1' && !locked && !draft.clientSigUri
 
   const recordLayout = (key: string, y: number) => {
     fieldPositions.current[key] = y

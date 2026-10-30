@@ -7,19 +7,17 @@ import { KeyRound, Pencil, Plus, UserCheck, UserX } from 'lucide-react'
 import { api, errorMessage } from '../../lib/api'
 import type { Engineer } from '../../lib/types'
 import { fmtDate } from '../../lib/format'
+import { isValidPhone, normalizePhone, PHONE_MESSAGE } from '../../lib/phone'
 import { Badge, Button, ConfirmDialog, EmptyState, ErrorState, Field, Input, Modal, Notice, PageHeader, Select, Skeleton, Table } from '../../components/ui'
 
 const optStr = (max: number) => z.string().trim().max(max, `At most ${max} characters`).optional().or(z.literal('')).transform(v => (v ? v : null))
-const mobilePhoneOpt = z.preprocess(v => {
-  if (typeof v !== 'string' || !v.trim()) return null
-  const clean = v.trim().replace(/\s+/g, '')
-  return clean.startsWith('+91') ? clean.slice(3) : clean
-}, z.string().regex(/^[6-9]\d{9}$/, 'Mobile number must be exactly 10 digits starting with 6-9').nullable().optional())
+const phoneOpt = z.preprocess(v => (typeof v === 'string' && v.trim() ? normalizePhone(v) : null),
+  z.string().refine(isValidPhone, PHONE_MESSAGE).nullable().optional())
 
 const createSchema = z.object({
   name: z.string().trim().min(1, 'Name is required').max(200, 'At most 200 characters'),
   email: z.string().trim().regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Enter a valid email').max(200, 'At most 200 characters'),
-  phone: mobilePhoneOpt,
+  phone: phoneOpt,
   employeeCode: optStr(50),
   password: z.string().min(8, 'At least 8 characters').max(128, 'At most 128 characters'),
 })
@@ -75,7 +73,7 @@ function EngineerForm({ mode, initial, onSubmit, busy, error, onCancel }: { mode
   return <form onSubmit={handleSubmit(d => onSubmit(d))} className="space-y-3" noValidate>
     <Field label="Name *" error={errors.name?.message}><Input {...register('name')} /></Field>
     {mode === 'create' && <Field label="Email (login) *" error={errors.email?.message}><Input type="email" autoComplete="off" {...register('email')} /></Field>}
-    <Field label="Phone" error={errors.phone?.message}><Input type="tel" placeholder="10-digit mobile, e.g. 9876543210" {...register('phone')} /></Field>
+    <Field label="Phone" error={errors.phone?.message}><Input type="tel" placeholder="e.g. 9876543210" {...register('phone')} /></Field>
     <Field label="Employee code" error={errors.employeeCode?.message}><Input {...register('employeeCode')} /></Field>
     {mode === 'create' && <Field label="Initial password *" error={errors.password?.message} hint="Share it with the engineer privately. They can change it from the app profile."><Input type="text" autoComplete="new-password" {...register('password')} /></Field>}
     {error && <Notice>{error}</Notice>}

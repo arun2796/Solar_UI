@@ -2,17 +2,14 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { AMC_STATUSES, type Client, type ClientUpsert } from '../../lib/types'
+import { isValidPhone, normalizePhone, PHONE_MESSAGE } from '../../lib/phone'
 import { Button, Field, Input, Notice, Select, Textarea } from '../../components/ui'
 
 // Inputs hold strings ('' when empty); the API wants null for "not set". Accept null/undefined too (API data).
 const blankToNull = (v: unknown) => (v === undefined || v === null || (typeof v === 'string' && v.trim() === '') ? null : v)
 const opt = (max = 200) => z.preprocess(v => { const b = blankToNull(v); return typeof b === 'string' ? b.trim() : b }, z.string().max(max, `At most ${max} characters`).nullable())
-const mobilePhone = z.preprocess(v => {
-  const b = blankToNull(v)
-  if (typeof b !== 'string') return b
-  const clean = b.trim().replace(/\s+/g, '')
-  return clean.startsWith('+91') ? clean.slice(3) : clean
-}, z.string().regex(/^[6-9]\d{9}$/, 'Mobile number must be exactly 10 digits starting with 6-9').nullable())
+const phone = z.preprocess(v => { const b = blankToNull(v); return typeof b === 'string' ? normalizePhone(b) : b },
+  z.string().refine(isValidPhone, PHONE_MESSAGE).nullable())
 const num = (label: string, int = false, maxDecimals = 2) => z.preprocess(v => { const b = blankToNull(v); return b === null ? null : Number(b) },
   z.number({ error: `${label} must be a number` }).min(0, `${label} cannot be negative`).max(1_000_000_000, `${label} is too large`)
     .refine(n => !int || Number.isInteger(n), `${label} must be a whole number`)
@@ -23,7 +20,7 @@ const date = z.preprocess(blankToNull, z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '
 const clientSchema = z.object({
   name: z.string().trim().min(1, 'Name is required').max(200, 'At most 200 characters'),
   contactPerson: opt(200),
-  phone: mobilePhone,
+  phone,
   email: z.preprocess(blankToNull, z.string().trim().regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Enter a valid email').max(200, 'At most 200 characters').nullable()),
   address: opt(500), siteLocation: opt(500),
   solarCapacityKwp: num('Capacity'), moduleMake: opt(), moduleModel: opt(), moduleCount: num('Module count', true), moduleWattage: num('Wattage'),
@@ -55,7 +52,7 @@ export function ClientForm({ initial, onSubmit, busy, onCancel, error }: { initi
   return <form onSubmit={handleSubmit(v => onSubmit(v as ClientUpsert))} className="grid gap-3 md:grid-cols-2" noValidate>
     {F({ k: 'name', label: 'Client name *', className: 'md:col-span-2' })}
     {F({ k: 'contactPerson', label: 'Contact person' })}
-    {F({ k: 'phone', label: 'Phone', type: 'tel', placeholder: '10-digit mobile, e.g. 9876543210' })}
+    {F({ k: 'phone', label: 'Phone', type: 'tel', placeholder: 'e.g. 9876543210 or 04412345678' })}
     {F({ k: 'email', label: 'Email', type: 'email' })}
     {F({ k: 'siteLocation', label: 'Site location', placeholder: 'e.g. Rooftop, Block A' })}
     <Field label="Address" error={e('address')} className="md:col-span-2"><Textarea {...register('address')} /></Field>

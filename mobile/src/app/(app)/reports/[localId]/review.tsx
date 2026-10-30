@@ -46,7 +46,7 @@ export default function Review() {
         `Please complete the following required items before final submit:\n\n${errorSummary}`,
         [
           { text: 'Review List', style: 'cancel' },
-          { text: 'Fix First Problem', onPress: () => open(issues[0].path) },
+          { text: 'Fix First Problem', onPress: () => open(`${issues[0].path}?check=1`) },
         ]
       )
       return
@@ -120,7 +120,7 @@ export default function Review() {
           Tap any field below to jump straight to that section:
         </Text>
         {issues.map(it => (
-          <Pressable key={it.message} accessibilityRole="button" onPress={() => open(it.path)}
+          <Pressable key={it.message} accessibilityRole="button" onPress={() => open(`${it.path}?check=1`)}
             style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44, paddingVertical: 6, borderTopWidth: 1, borderTopColor: '#FECACA' }}>
             <Text style={{ color: colors.danger, fontWeight: '700', fontSize: font.small, flex: 1 }}>• {it.message}</Text>
             <Text style={{ color: colors.danger, fontWeight: '800', fontSize: font.small, marginLeft: 6 }}>Fix ›</Text>

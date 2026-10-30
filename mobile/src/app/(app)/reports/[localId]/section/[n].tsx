@@ -9,7 +9,7 @@ import { Button, Field, Input, Loading, NotFound, NumberInput, Progress, Screen,
 import { colors, font, space } from '../../../../../theme'
 
 export default function SectionScreen() {
-  const { localId, n: nStr } = useLocalSearchParams<{ localId: string; n: string }>()
+  const { localId, n: nStr, check } = useLocalSearchParams<{ localId: string; n: string; check?: string }>()
   const n = Math.min(8, Math.max(1, Number(nStr) || 1))
   const router = useRouter()
   const nav = useNavigation()
@@ -36,7 +36,8 @@ export default function SectionScreen() {
 
   // Identify all missing/invalid fields in this section
   const issues = getMissingReportIssues(f, { engineer: !!draft.engineerSigUri, client: !!draft.clientSigUri }, localId)
-  const sectionIssues = issues.filter(x => x.section === n)
+  // Missing fields are marked only when the engineer came from the review's list (?check=1), not while filling in.
+  const sectionIssues = check === '1' ? issues.filter(x => x.section === n) : []
   const issueMap = new Map(sectionIssues.map(i => [i.fieldKey, i.message]))
 
   const recordLayout = (key: string, y: number) => {

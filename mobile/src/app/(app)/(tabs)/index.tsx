@@ -35,7 +35,7 @@ export default function Dashboard() {
       {stat('Upcoming (14 d)', dash.data?.upcoming.length ?? '—')}
     </View>
     <Card><Text style={{ fontWeight: '800', fontSize: font.large, marginBottom: space.sm }}>My visits</Text>
-      {!dash.data ? <Empty text={dash.isError ? 'Could not load from the server.' : 'Loading…'} /> : visits.length === 0 ? <Empty text="No visits assigned to you. You can still start any client below." /> :
+      {!dash.data ? <Empty text={dash.isError ? 'Could not load from the server.' : 'Loading…'} /> : visits.length === 0 ? <Empty text="No visits assigned to you. You can start any client that is not assigned to another engineer." /> :
         visits.map(v => <VisitRow key={v.id} v={v} todayIso={todayIso} onPress={() => router.push(`/(app)/clients/${v.clientId}`)} />)}</Card>
     {open.length > 0 && <Card><Text style={{ fontWeight: '800', fontSize: font.large, marginBottom: space.sm }}>Continue a draft</Text>
       {open.slice(0, 3).map(d => <Pressable key={d.localId} accessibilityRole="button" onPress={() => router.push(`/(app)/reports/${d.localId}/review`)} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: space.sm, minHeight: 52, paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#E2E8F0' }}>
