@@ -10,8 +10,8 @@ import { colors, font, space } from '../theme'
  * Captures a signature and writes it to a NEW PNG file each time (an upload may still be reading the previous one).
  * The draft store deletes superseded files. `onDrawing` lets the parent stop page scrolling while the finger is down.
  */
-export function SignaturePad({ title, filePrefix, onSaved, existingUri, disabled, onDrawing }: {
-  title: string; filePrefix: string; onSaved: (uri: string) => Promise<void> | void; existingUri?: string | null; disabled?: boolean; onDrawing?: (drawing: boolean) => void
+export function SignaturePad({ title, filePrefix, onSaved, existingUri, disabled, onDrawing, error }: {
+  title: string; filePrefix: string; onSaved: (uri: string) => Promise<void> | void; existingUri?: string | null; disabled?: boolean; onDrawing?: (drawing: boolean) => void; error?: string
 }) {
   const ref = useRef<SignatureViewRef>(null)
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null)
@@ -30,11 +30,15 @@ export function SignaturePad({ title, filePrefix, onSaved, existingUri, disabled
     } finally { setBusy(false) }
   }
   const style = `.m-signature-pad { box-shadow: none; border: none; } .m-signature-pad--body { border: none; } .m-signature-pad--footer { display: none; } body,html { background: #fff; }`
+  const hasError = !!error && !existingUri
+
   return <View style={{ marginBottom: space.lg }}>
-    <Text style={{ fontSize: font.base, fontWeight: '800', marginBottom: space.sm, color: colors.text }}>{title}{existingUri ? '  ✓ saved' : ''}</Text>
+    <Text style={{ fontSize: font.base, fontWeight: '800', marginBottom: space.sm, color: hasError ? colors.danger : colors.text }}>
+      {title}{existingUri ? '  ✓ saved' : ''}
+    </Text>
     {disabled ? <View style={{ height: 80, borderWidth: 2, borderColor: colors.border, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface }}>
       <Text style={{ color: colors.muted }}>{existingUri ? 'Signed — report is locked' : 'Report is locked'}</Text></View> : <>
-      <View style={{ height: 220, borderWidth: 2, borderColor: colors.border, borderRadius: 10, overflow: 'hidden', backgroundColor: '#fff' }}>
+      <View style={{ height: 220, borderWidth: 2, borderColor: hasError ? colors.danger : colors.border, borderRadius: 10, overflow: 'hidden', backgroundColor: '#fff' }}>
         <SignatureScreen ref={ref} onOK={handleOK} onEmpty={() => { setBusy(false); setMsg({ text: 'The pad is empty — sign first, then tap Save.', ok: false }) }}
           onBegin={() => onDrawing?.(true)} onEnd={() => onDrawing?.(false)}
           webStyle={style} backgroundColor="#ffffff" penColor={colors.text} descriptionText="" imageType="image/png" autoClear={false} />
@@ -43,6 +47,7 @@ export function SignaturePad({ title, filePrefix, onSaved, existingUri, disabled
         <Button title="Clear" variant="secondary" onPress={() => { ref.current?.clearSignature(); setMsg(null) }} style={{ flex: 1 }} />
         <Button title={existingUri ? 'Save new signature' : 'Save signature'} loading={busy} onPress={() => { setBusy(true); setMsg(null); ref.current?.readSignature() }} style={{ flex: 2 }} />
       </View></>}
+    {hasError && <Text accessibilityRole="alert" style={{ marginTop: space.xs, fontWeight: '700', color: colors.danger }}>{error}</Text>}
     {msg && <Text accessibilityRole="alert" style={{ marginTop: space.xs, fontWeight: '700', color: msg.ok ? colors.good : colors.danger }}>{msg.text}</Text>}
   </View>
 }
