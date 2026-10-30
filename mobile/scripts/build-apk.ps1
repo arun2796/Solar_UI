@@ -97,7 +97,7 @@ if ($Keystore) {
   $pw = Read-Host "Password for keystore $Keystore" -AsSecureString
   $env:SOLAR_KS_PASS = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($pw))
   try {
-    & $apksigner sign --ks $Keystore --ks-key-alias $KeyAlias --ks-pass env:SOLAR_KS_PASS --out $out $apk
+    & $apksigner sign --v4-signing-enabled false --ks $Keystore --ks-key-alias $KeyAlias --ks-pass env:SOLAR_KS_PASS --out $out $apk
     if ($LASTEXITCODE -ne 0) { throw "apksigner failed" }
     & $apksigner verify $out
     if ($LASTEXITCODE -ne 0) { throw "apksigner verify failed" }
