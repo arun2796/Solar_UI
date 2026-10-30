@@ -20,6 +20,15 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot          # mobile/
 Set-Location $root
 
+if (-not $env:ANDROID_HOME) {
+  $defaultSdk = Join-Path $env:LOCALAPPDATA "Android\Sdk"
+  if (Test-Path $defaultSdk) { $env:ANDROID_HOME = $defaultSdk }
+}
+if (-not $env:JAVA_HOME) {
+  $jbr = "C:\Program Files\Android\Android Studio\jbr"
+  if (Test-Path $jbr) { $env:JAVA_HOME = $jbr }
+}
+
 function Read-EnvValue([string]$file, [string]$name) {
   $p = Join-Path $root $file
   if (-not (Test-Path $p)) { return $null }
@@ -50,6 +59,12 @@ Write-Host "Profile: $Profile   API: $ApiUrl   Dev sign-in: $($env:EXPO_PUBLIC_D
 
 npx expo prebuild --platform android --no-install
 if ($LASTEXITCODE -ne 0) { throw "expo prebuild failed" }
+
+if ($env:ANDROID_HOME) {
+  $escapedSdk = $env:ANDROID_HOME.Replace("\", "\\")
+  Set-Content -Path (Join-Path $root "android\local.properties") -Value "sdk.dir=$escapedSdk"
+}
+
 Push-Location android
 try {
   .\gradlew.bat assembleRelease --no-daemon
@@ -82,7 +97,7 @@ if ($Keystore) {
   $pw = Read-Host "Password for keystore $Keystore" -AsSecureString
   $env:SOLAR_KS_PASS = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($pw))
   try {
-    & $apksigner sign --ks $Keystore --ks-key-alias $KeyAlias --ks-pass env:SOLAR_KS_PASS --out $out $apk
+    & $apksigner sign --v4-signing-enabled false --ks $Keystore --ks-key-alias $KeyAlias --ks-pass env:SOLAR_KS_PASS --out $out $apk
     if ($LASTEXITCODE -ne 0) { throw "apksigner failed" }
     & $apksigner verify $out
     if ($LASTEXITCODE -ne 0) { throw "apksigner verify failed" }

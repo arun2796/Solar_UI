@@ -59,6 +59,7 @@ async function clear() {
 /** Stores a session returned by /auth/login or /dev/login and switches the app to signed in. */
 export async function startSession(r: AuthResponse, dev = false) {
   await save(r, dev)
+  markActive()
   authStore.set({ status: 'in', dev, userId: r.user.userId })
 }
 
@@ -104,14 +105,30 @@ export async function signOut() {
   if (s) await axios.post(`${config.apiUrl}/auth/logout`, { refreshToken: s.refreshToken }, { timeout: 8000 }).catch(() => { /* offline: the token expires on its own */ })
 }
 
-/** Restores the stored session; call once from the root layout. */
+/** Idle sign-out: 15 minutes without a touch, also across app restarts (Android may close a backgrounded app). */
+export const IDLE_TIMEOUT_MS = 15 * 60 * 1000
+const LAST_ACTIVE = 'solar_last_active'
+
+/** Remembers when the engineer last used the app, so a restart within the idle limit keeps them signed in. */
+export function markActive(at = Date.now()) {
+  void AsyncStorage.setItem(LAST_ACTIVE, String(at)).catch(() => {})
+}
+
+/**
+ * Restores the stored session (works offline) unless the app was idle for longer than IDLE_TIMEOUT_MS;
+ * then signs out properly, revoking the refresh token when the API is reachable. Call once from the root layout.
+ */
 export function initAuth(): () => void {
   let alive = true
-  void load().then(async s => {
+  void (async () => {
+    const s = await load()
+    const last = Number(await AsyncStorage.getItem(LAST_ACTIVE).catch(() => null))
     if (!alive) return
     if (!s) { await clear(); authStore.set({ status: 'out', dev: false, userId: null }); return }
     session = s
+    if (!last || Date.now() - last >= IDLE_TIMEOUT_MS) { await signOut(); return }
+    markActive()
     authStore.set({ status: 'in', dev: s.dev, userId: s.user.userId })
-  })
+  })()
   return () => { alive = false }
 }

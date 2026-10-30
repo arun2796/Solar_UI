@@ -1,56 +1,104 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Alert, Pressable, Text, View } from 'react-native'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Alert, Pressable, ScrollView, Text, View } from 'react-native'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { drafts, type Draft } from '../../../../db'
-import { missingItems } from '../../../../forms/schema'
+import { getMissingReportIssues, sectionComplete } from '../../../../forms/schema'
 import { conflictDiff, resolveConflict, runSync, syncNow } from '../../../../sync/engine'
 import { syncStore } from '../../../../lib/store'
 import { SECTIONS, fmtDate } from '../../../../lib/types'
-import { Button, Card, Loading, NotFound, Row, Screen, StateBadge } from '../../../../components/ui'
+import { Button, Card, Loading, NotFound, Progress, Row, Screen, StateBadge } from '../../../../components/ui'
 import { colors, font, space } from '../../../../theme'
 
 export default function Review() {
-  const { localId } = useLocalSearchParams<{ localId: string }>(); const router = useRouter()
-  const [d, setD] = useState<Draft | null | undefined>(undefined); const [busy, setBusy] = useState(false)
-  const tick = syncStore.use(s => s.tick); const net = syncStore.use(s => s.net)
+  const { localId } = useLocalSearchParams<{ localId: string }>()
+  const router = useRouter()
+  const scrollRef = useRef<any>(null)
+  const [d, setD] = useState<Draft | null | undefined>(undefined)
+  const [busy, setBusy] = useState(false)
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false)
+  const tick = syncStore.use(s => s.tick)
+  const net = syncStore.use(s => s.net)
+
   const reload = useCallback(() => { drafts.get(localId).then(setD) }, [localId])
-  useFocusEffect(reload); useEffect(reload, [tick, reload])
+  useFocusEffect(reload)
+  useEffect(reload, [tick, reload])
   useEffect(() => { if (d?.syncState === 'submitted' && d.reportRef) router.replace(`/(app)/reports/${localId}/success`) }, [d, localId, router])
+
   if (d === undefined) return <Screen><Loading /></Screen>
   if (d === null) return <NotFound onBack={() => router.replace('/(app)')} />
+
   const f = d.fields
-  const missing = missingItems(f, { engineer: !!d.engineerSigUri, client: !!d.clientSigUri })
-  /** Missing items grouped per section, so the engineer jumps straight to the right screen. */
-  const missingGroups = [
-    ...(missing.some(m => m.startsWith('Visit date') || m.startsWith('Number of technicians') || m.startsWith('Visit')) ? [{ key: 'h', title: 'Visit details', detail: 'Visit date and number of technicians', count: 0, path: `/(app)/reports/${localId}/section/1` }] : []),
-    ...SECTIONS.map(sec => ({ sec, rows: sec.rows.filter(r => f[r.key] === null || f[r.key] === undefined || (f[r.key] as unknown) === '') }))
-      .filter(x => x.rows.length).map(x => ({ key: `s${x.sec.n}`, title: `${x.sec.n}. ${x.sec.title}`, detail: x.rows.map(r => r.label).join(', '), count: x.rows.length, path: `/(app)/reports/${localId}/section/${x.sec.n}` })),
-    ...(!f.nextVisitDate ? [{ key: 's8', title: '8. Observations and Issues', detail: 'Next visit date', count: 1, path: `/(app)/reports/${localId}/section/8` }] : []),
-    ...(!d.engineerSigUri || !d.clientSigUri || !f.clientRepName?.trim() ? [{ key: 'sig', title: 'Signatures', detail: [!d.engineerSigUri && 'Engineer signature', !f.clientRepName?.trim() && 'Client representative name', !d.clientSigUri && 'Client signature'].filter(Boolean).join(', '), count: 0, path: `/(app)/reports/${localId}/signatures` }] : []),
-  ]
+  const issues = getMissingReportIssues(f, { engineer: !!d.engineerSigUri, client: !!d.clientSigUri }, localId)
+  const done = [1, 2, 3, 4, 5, 6, 7, 8].map(i => sectionComplete(i, f))
+  const incomplete = [1, 2, 3, 4, 5, 6, 7, 8].map(i => !done[i - 1])
   const defects = SECTIONS.flatMap(s => s.rows.filter(r => f[r.key] === 'DEFECT' || (r.key === 's1BrokenModule' && f[r.key] === 'YES')).map(r => `${s.n}. ${r.label}`))
   const editable = !['submitting', 'submitted', 'conflict', 'elsewhere'].includes(d.syncState)
 
-  const submit = () => Alert.alert('Submit final report?', `${d.clientName}\nVisit ${fmtDate(f.visitDate)} · Next visit ${fmtDate(f.nextVisitDate)}\n\nAfter submission the report is locked and cannot be edited from the app.`, [
-    { text: 'Cancel', style: 'cancel' },
-    { text: 'Submit', style: 'default', onPress: async () => {
-      setBusy(true)
-      await drafts.patch(localId, { submitRequested: 1, syncState: 'submitting', lastError: null, attempts: 0, nextAttemptAt: null })
-      await runSync({ manual: true }); setBusy(false); reload()
-    } }])
+  const open = (path: string) => { if (editable) router.push(path as never) }
+
+  const submit = () => {
+    if (issues.length > 0) {
+      setAttemptedSubmit(true)
+      scrollRef.current?.scrollTo({ y: 0, animated: true })
+      const errorSummary = issues.map(i => `• ${i.message}`).join('\n')
+      Alert.alert(
+        `Incomplete Report (${issues.length} missing)`,
+        `Please complete the following required items before final submit:\n\n${errorSummary}`,
+        [
+          { text: 'Review List', style: 'cancel' },
+          { text: 'Fix First Problem', onPress: () => open(issues[0].path) },
+        ]
+      )
+      return
+    }
+
+    Alert.alert(
+      'Submit final report?',
+      `${d.clientName}\nVisit ${fmtDate(f.visitDate)} · Next visit ${fmtDate(f.nextVisitDate)}\n\nAfter submission the report is locked and cannot be edited from the app.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Submit',
+          style: 'default',
+          onPress: async () => {
+            setBusy(true)
+            await drafts.patch(localId, { submitRequested: 1, syncState: 'submitting', lastError: null, attempts: 0, nextAttemptAt: null })
+            await runSync({ manual: true })
+            setBusy(false)
+            reload()
+          },
+        },
+      ]
+    )
+  }
+
   const discard = () => Alert.alert('Discard local copy?', 'The report on the server is not affected. Only this phone’s copy is removed.', [
     { text: 'Cancel', style: 'cancel' }, { text: 'Discard', style: 'destructive', onPress: async () => { await drafts.remove(localId); router.dismissAll(); router.replace('/(app)/drafts') } }])
-  const open = (path: string) => { if (editable) router.push(path as never) }
 
   const footer = d.syncState === 'conflict' || d.syncState === 'elsewhere' ? undefined : <>
     {d.syncState === 'submitting'
       ? <><Text style={{ textAlign: 'center', color: colors.info, fontWeight: '800', fontSize: font.base }}>{net === 'offline' ? 'Queued — will submit automatically when back online' : 'Submitting… it will keep retrying until the server confirms'}</Text>
           <Button title="Try now" variant="secondary" onPress={() => void syncNow().then(reload)} /></>
-      : <Button title={missing.length ? `${missing.length} item(s) missing` : 'Submit final report'} disabled={missing.length > 0 || !editable} loading={busy} onPress={submit} />}
+      : <Button
+          title={issues.length > 0 && attemptedSubmit ? `Fix ${issues.length} missing item(s) to submit` : 'Submit final report'}
+          variant={issues.length > 0 && attemptedSubmit ? 'danger' : 'primary'}
+          disabled={!editable}
+          loading={busy}
+          onPress={submit}
+        />}
     <Button title="Save draft and exit" variant="secondary" onPress={() => { router.dismissAll(); router.replace('/(app)/drafts') }} /></>
 
-  return <Screen footer={footer}>
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: space.md, gap: space.sm }}><Text style={{ fontSize: font.title, fontWeight: '800', flex: 1 }}>{d.clientName}</Text><StateBadge state={d.syncState} /></View>
+  const headerIssues = issues.filter(x => x.fieldKey === 'visitDate' || x.fieldKey === 'technicianCount')
+  const sigIssues = issues.filter(x => x.section === 'signatures')
+
+  return <Screen scrollRef={scrollRef} footer={footer}>
+    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: space.sm, gap: space.sm }}>
+      <Text style={{ fontSize: font.title, fontWeight: '800', flex: 1 }}>{d.clientName}</Text>
+      <StateBadge state={d.syncState} />
+    </View>
+
+    <Progress done={done} incomplete={attemptedSubmit ? incomplete : undefined} onSelect={to => open(`/(app)/reports/${localId}/section/${to}`)} />
+
     {d.lastError && d.syncState !== 'conflict' && d.syncState !== 'elsewhere' && <Card style={{ borderColor: colors.danger, backgroundColor: colors.defectSoft }}>
       <Text style={{ color: colors.danger, fontWeight: '700' }}>{d.lastError}</Text>
       {(d.syncState === 'failed' || d.syncState === 'local') && <Button title="Retry sync now" variant="secondary" onPress={() => void syncNow().then(reload)} style={{ marginTop: space.sm }} />}</Card>}
@@ -62,24 +110,115 @@ export default function Review() {
 
     {d.syncState === 'conflict' && <ConflictCard d={d} onResolved={reload} />}
 
-    <Card><Row k="Visit date" v={fmtDate(f.visitDate)} /><Row k="Previous maintenance" v={fmtDate(f.previousMaintenanceDate)} /><Row k="Technicians" v={f.technicianCount ?? undefined} /><Row k="Next visit date" v={fmtDate(f.nextVisitDate)} />
-      <Row k="Signatures" v={`${d.engineerSigUri ? '✓' : '✗'} engineer · ${d.clientSigUri ? '✓' : '✗'} client`} /><Row k="Client representative" v={f.clientRepName || undefined} /></Card>
-    {editable && missing.length > 0 && <Card style={{ borderColor: colors.warn, backgroundColor: colors.warnSoft }}>
-      <Text style={{ fontWeight: '800', fontSize: font.large, marginBottom: space.sm }}>Still to fill in</Text>
-      {missingGroups.map(g => <Pressable key={g.key} accessibilityRole="button" onPress={() => open(g.path)}
-        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 52, paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#FDE68A' }}>
-        <View style={{ flex: 1 }}><Text style={{ fontWeight: '700', fontSize: font.base }}>{g.title}</Text>{g.detail ? <Text style={{ color: colors.muted, fontSize: font.small }} numberOfLines={2}>{g.detail}</Text> : null}</View>
-        <Text style={{ color: colors.primary, fontWeight: '800', fontSize: font.base }}>{g.count ? `${g.count} ›` : '›'}</Text></Pressable>)}
-    </Card>}
-    <Card style={defects.length ? { borderColor: colors.defect } : undefined}><Text style={{ fontWeight: '800', marginBottom: 4 }}>{defects.length ? `${defects.length} defect(s) recorded` : 'No defects recorded'}</Text>{defects.map(m => <Text key={m} style={{ color: colors.defect, fontSize: font.small }}>• {m}</Text>)}</Card>
-    {SECTIONS.map(s => <Pressable key={s.n} disabled={!editable} onPress={() => open(`/(app)/reports/${localId}/section/${s.n}`)}><Card><Text style={{ fontWeight: '800', fontSize: font.base, marginBottom: 4 }}>{s.n}. {s.title}{editable ? '  ›' : ''}</Text>
-      {s.rows.map(r => <Row key={r.key} k={r.label} v={(f[r.key] as string | number | null | undefined) ?? undefined} />)}
-      {!!f[s.remarks] && <Text style={{ color: colors.muted, fontSize: font.small, marginTop: 4 }}>Remarks: {f[s.remarks] as string}</Text>}</Card></Pressable>)}
-    <Pressable disabled={!editable} onPress={() => open(`/(app)/reports/${localId}/section/8`)}><Card><Text style={{ fontWeight: '800', fontSize: font.base, marginBottom: 4 }}>8. Observations and Issues{editable ? '  ›' : ''}</Text><Row k="General observations" v={f.s8GeneralObservations || undefined} /><Row k="Action required" v={f.s8ActionRequired || undefined} /></Card></Pressable>
+    {/* Clear Missing Items Alert Banner when submission was attempted or incomplete */}
+    {editable && issues.length > 0 && (
+      <Card style={{ borderColor: colors.danger, borderWidth: 2, backgroundColor: colors.defectSoft }}>
+        <Text style={{ fontWeight: '800', fontSize: font.large, color: colors.danger, marginBottom: 4 }}>
+          ⚠️ Incomplete Report ({issues.length} missing)
+        </Text>
+        <Text style={{ color: colors.text, fontSize: font.small, marginBottom: space.sm }}>
+          Tap any field below to jump straight to that section:
+        </Text>
+        {issues.map(it => (
+          <Pressable key={it.message} accessibilityRole="button" onPress={() => open(it.path)}
+            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44, paddingVertical: 6, borderTopWidth: 1, borderTopColor: '#FECACA' }}>
+            <Text style={{ color: colors.danger, fontWeight: '700', fontSize: font.small, flex: 1 }}>• {it.message}</Text>
+            <Text style={{ color: colors.danger, fontWeight: '800', fontSize: font.small, marginLeft: 6 }}>Fix ›</Text>
+          </Pressable>
+        ))}
+      </Card>
+    )}
+
+    {/* Header & Visit details card */}
+    <Card style={headerIssues.length > 0 && attemptedSubmit ? { borderColor: colors.danger, borderWidth: 2, backgroundColor: colors.defectSoft } : undefined}>
+      <Row k="Visit date" v={fmtDate(f.visitDate)} />
+      <Row k="Previous maintenance" v={fmtDate(f.previousMaintenanceDate)} />
+      <Row k="Technicians" v={f.technicianCount ?? undefined} />
+      <Row k="Next visit date" v={fmtDate(f.nextVisitDate)} />
+      {headerIssues.length > 0 && attemptedSubmit && (
+        <Text style={{ color: colors.danger, fontWeight: '700', fontSize: font.small, marginTop: 4 }}>
+          Missing: {headerIssues.map(x => x.fieldLabel).join(', ')}
+        </Text>
+      )}
+    </Card>
+
+    {/* Signatures card */}
+    <Pressable disabled={!editable} onPress={() => open(`/(app)/reports/${localId}/signatures`)}>
+      <Card style={sigIssues.length > 0 && attemptedSubmit ? { borderColor: colors.danger, borderWidth: 2, backgroundColor: colors.defectSoft } : undefined}>
+        <Text style={{ fontWeight: '800', fontSize: font.base, marginBottom: 4 }}>Signatures{editable ? '  ›' : ''}</Text>
+        <Row k="Signatures" v={`${d.engineerSigUri ? '✓' : '✗'} engineer · ${d.clientSigUri ? '✓' : '✗'} client`} />
+        <Row k="Client representative" v={f.clientRepName || undefined} />
+        {sigIssues.length > 0 && attemptedSubmit && (
+          <Text style={{ color: colors.danger, fontWeight: '700', fontSize: font.small, marginTop: 4 }}>
+            Missing: {sigIssues.map(x => x.fieldLabel).join(', ')}
+          </Text>
+        )}
+      </Card>
+    </Pressable>
+
+    {/* Defects summary card */}
+    <Card style={defects.length ? { borderColor: colors.defect } : undefined}>
+      <Text style={{ fontWeight: '800', marginBottom: 4 }}>{defects.length ? `${defects.length} defect(s) recorded` : 'No defects recorded'}</Text>
+      {defects.map(m => <Text key={m} style={{ color: colors.defect, fontSize: font.small }}>• {m}</Text>)}
+    </Card>
+
+    {/* Section cards with red outline when incomplete */}
+    {SECTIONS.map(s => {
+      const secIssues = issues.filter(x => x.section === s.n)
+      const isMissing = attemptedSubmit && secIssues.length > 0
+      return (
+        <Pressable key={s.n} disabled={!editable} onPress={() => open(`/(app)/reports/${localId}/section/${s.n}`)}>
+          <Card style={isMissing ? { borderColor: colors.danger, borderWidth: 2, backgroundColor: colors.defectSoft } : undefined}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <Text style={{ fontWeight: '800', fontSize: font.base, color: isMissing ? colors.danger : colors.text }}>
+                {s.n}. {s.title}
+              </Text>
+              <Text style={{ color: isMissing ? colors.danger : colors.muted, fontWeight: '700' }}>
+                {done[s.n - 1] ? '✓ Done' : isMissing ? '⚠️ Incomplete' : '›'}
+              </Text>
+            </View>
+            {s.rows.map(r => <Row key={r.key} k={r.label} v={(f[r.key] as string | number | null | undefined) ?? undefined} />)}
+            {!!f[s.remarks] && <Text style={{ color: colors.muted, fontSize: font.small, marginTop: 4 }}>Remarks: {f[s.remarks] as string}</Text>}
+            {isMissing && (
+              <Text style={{ color: colors.danger, fontWeight: '700', fontSize: font.small, marginTop: 6 }}>
+                Missing: {secIssues.map(x => x.fieldLabel).join(', ')}
+              </Text>
+            )}
+          </Card>
+        </Pressable>
+      )
+    })}
+
+    {/* Section 8 card */}
+    {(() => {
+      const s8Issues = issues.filter(x => x.section === 8)
+      const isMissing = attemptedSubmit && s8Issues.length > 0
+      return (
+        <Pressable disabled={!editable} onPress={() => open(`/(app)/reports/${localId}/section/8`)}>
+          <Card style={isMissing ? { borderColor: colors.danger, borderWidth: 2, backgroundColor: colors.defectSoft } : undefined}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <Text style={{ fontWeight: '800', fontSize: font.base, color: isMissing ? colors.danger : colors.text }}>
+                8. Observations and Issues
+              </Text>
+              <Text style={{ color: isMissing ? colors.danger : colors.muted, fontWeight: '700' }}>
+                {done[7] ? '✓ Done' : isMissing ? '⚠️ Incomplete' : '›'}
+              </Text>
+            </View>
+            <Row k="General observations" v={f.s8GeneralObservations || undefined} />
+            <Row k="Action required" v={f.s8ActionRequired || undefined} />
+            <Row k="Next visit date" v={fmtDate(f.nextVisitDate)} />
+            {isMissing && (
+              <Text style={{ color: colors.danger, fontWeight: '700', fontSize: font.small, marginTop: 6 }}>
+                Missing: {s8Issues.map(x => x.fieldLabel).join(', ')}
+              </Text>
+            )}
+          </Card>
+        </Pressable>
+      )
+    })()}
   </Screen>
 }
 
-/** Shows exactly what differs between this phone and the server before the engineer chooses. Nothing is overwritten until then. */
 function ConflictCard({ d, onResolved }: { d: Draft; onResolved: () => void }) {
   const diff = conflictDiff(d)
   const [busy, setBusy] = useState<'mine' | 'server' | null>(null)

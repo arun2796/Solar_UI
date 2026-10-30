@@ -6,6 +6,24 @@ import { syncStore } from '../lib/store'
 import type { ReportFields } from '../lib/types'
 import { scheduleSync } from '../sync/engine'
 
+type DraftFlusher = () => Promise<void>
+let activeFlusher: DraftFlusher | null = null
+
+export function registerActiveDraftFlusher(fn: DraftFlusher | null) {
+  activeFlusher = fn
+}
+
+/** Flushes any open, unsaved in-memory draft directly to local SQLite storage. */
+export async function flushActiveDraft() {
+  if (activeFlusher) {
+    try {
+      await activeFlusher()
+    } catch {
+      // ignore flush error on exit
+    }
+  }
+}
+
 /**
  * Loads a local draft and autosaves field changes to SQLite (debounced 1.2 s), then nudges the sync engine.
  * Pending edits are flushed when the screen loses focus, unmounts, or the app goes to the background
@@ -32,6 +50,13 @@ export function useDraft(localId: string) {
   useFocusEffect(useCallback(() => { void reload(); return () => { void flush() } }, [reload, flush]))
   useEffect(() => () => { void flush() }, [flush])
   useEffect(() => { const s = AppState.addEventListener('change', st => { if (st !== 'active') void flush() }); return () => s.remove() }, [flush])
+
+  // Register with global flusher so auto-logout saves any pending draft before signing out
+  useEffect(() => {
+    registerActiveDraftFlusher(flush)
+    return () => registerActiveDraftFlusher(null)
+  }, [flush])
+
   // Sync state changes (synced, conflict, submitted…) must show up while the screen is open.
   const tick = syncStore.use(s => s.tick)
   useEffect(() => { if (tick) void reload() }, [tick, reload])

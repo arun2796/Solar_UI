@@ -11,6 +11,14 @@ import { Button, Card, ErrorState, Field, Input, Notice, PageHeader, Skeleton, T
 type CompanyForm = Omit<Company, 'logoUrl' | 'updatedAt'>
 const MAX_LOGO = 1024 * 1024
 const emailRule = { validate: (v?: string | null) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) || 'Enter a valid email' }
+const phoneRule = {
+  validate: (v?: string | null) => {
+    if (!v || !v.trim()) return true
+    const clean = v.trim().replace(/\s+/g, '')
+    const stripped = clean.startsWith('+91') ? clean.slice(3) : clean
+    return /^[6-9]\d{9}$/.test(stripped) || 'Mobile number must be exactly 10 digits starting with 6-9'
+  }
+}
 
 /** Cleared inputs become null (not '') so the API stores "not set". */
 const toPayload = (d: CompanyForm): CompanyForm => Object.fromEntries(Object.entries(d).map(([k, v]) => [k, typeof v === 'string' ? (v.trim() === '' ? null : v.trim()) : v])) as CompanyForm
@@ -53,7 +61,7 @@ export default function SettingsPage() {
             <Field label="Company name *" error={errors.companyName?.message} className="md:col-span-2"><Input {...register('companyName', { validate: v => !!v?.trim() || 'Company name is required' })} /></Field>
             <Field label="Address line 1"><Input {...register('addressLine1')} /></Field><Field label="Address line 2"><Input {...register('addressLine2')} /></Field>
             <Field label="City"><Input {...register('city')} /></Field><Field label="State"><Input {...register('state')} /></Field><Field label="Pincode"><Input inputMode="numeric" {...register('pincode')} /></Field>
-            <Field label="Phone"><Input type="tel" {...register('phone')} /></Field>
+            <Field label="Phone" error={errors.phone?.message}><Input type="tel" placeholder="10-digit mobile, e.g. 9876543210" {...register('phone', phoneRule)} /></Field>
             <Field label="Email" error={errors.email?.message}><Input type="email" {...register('email', emailRule)} /></Field>
             <Field label="Website"><Input {...register('website')} /></Field>
             <Field label="GST number"><Input {...register('gstNumber')} /></Field>
