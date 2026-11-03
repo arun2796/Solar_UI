@@ -49,6 +49,7 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
+    "test": "node --no-warnings --test \"src/**/*.test.mts\"",
     "start": "expo start --clear --port 8083",
     "android": "expo run:android",
     "ios": "expo run:ios",

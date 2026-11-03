@@ -27,7 +27,8 @@ import {
 import { surveyDrafts } from '../../../../db'
 import { useSurveyDraft } from '../../../../forms/useSurveyDraft'
 import { captureOrPickPhoto, getCurrentGps } from '../../../../lib/photoService'
-import { TARIFF_RATES } from '../../../../lib/surveyCalculator'
+import { tariffRate } from '../../../../lib/surveyCalculator'
+import { currentSurveySettings } from '../../../../lib/surveySettings'
 import type {
   CableRouteItem,
   CustomerType,
@@ -608,7 +609,7 @@ export default function SurveyFormScreen() {
                   style={[styles.tagBtn, s2.tariffCategory === tc && styles.tagBtnActive]}
                 >
                   <Text style={[styles.tagText, s2.tariffCategory === tc && styles.tagTextActive]}>
-                    {tc} (₹{TARIFF_RATES[tc]}/unit)
+                    {tc} (₹{tariffRate(tc, currentSurveySettings())}/unit)
                   </Text>
                 </Pressable>
               ))}

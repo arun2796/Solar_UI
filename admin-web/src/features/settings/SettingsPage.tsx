@@ -90,6 +90,19 @@ export default function SettingsPage() {
   </>
 }
 
+// Same keys as the API (SurveySettingsService.Defaults); the survey app reads them for its calculations.
+const SURVEY_CONSTANTS = [
+  { key: 'generation_per_kw_per_day', label: 'Generation per kW per day (units)', hint: 'Default 4' },
+  { key: 'area_per_kw_sqft', label: 'Roof area per kW (sq.ft)', hint: 'Default 50' },
+  { key: 'default_panel_wp', label: 'Panel rating (Wp)', hint: 'Default 550' },
+  { key: 'cable_buffer_multiplier', label: 'Cable buffer multiplier', hint: '1.2 = 20% extra' },
+  { key: 'days_in_24_months', label: 'Days in 24 months', hint: 'Default 730' },
+  { key: 'days_in_month', label: 'Days per month', hint: 'Default 30' },
+]
+const SURVEY_TARIFFS = [
+  { key: 'tariff_lt1', label: 'LT-1' }, { key: 'tariff_lt2', label: 'LT-2' }, { key: 'tariff_lt3', label: 'LT-3' }, { key: 'tariff_ht', label: 'HT' },
+]
+
 function SurveySettingsCard() {
   const qc = useQueryClient()
   const q = useQuery({
@@ -143,101 +156,16 @@ function SurveySettingsCard() {
       ) : (
         <form onSubmit={handleSave} className="space-y-4">
           <div className="grid gap-4 md:grid-cols-3">
-            <Field label="Sq.ft required per kW (sqft_per_kw)">
-              <Input
-                type="number"
-                step="any"
-                value={form.sqft_per_kw ?? '100'}
-                onChange={e => setVal('sqft_per_kw', e.target.value)}
-                required
-              />
-            </Field>
-
-            <Field label="Default Panel Wattage (panel_wp)">
-              <Input
-                type="number"
-                step="1"
-                value={form.panel_wp ?? '550'}
-                onChange={e => setVal('panel_wp', e.target.value)}
-                required
-              />
-            </Field>
-
-            <Field label="Avg. Peak Sun Hours / Day">
-              <Input
-                type="number"
-                step="0.1"
-                value={form.avg_daily_generation_hours ?? '4'}
-                onChange={e => setVal('avg_daily_generation_hours', e.target.value)}
-                required
-              />
-            </Field>
-
-            <Field label="Days per Month (days_per_month)">
-              <Input
-                type="number"
-                step="1"
-                value={form.days_per_month ?? '30'}
-                onChange={e => setVal('days_per_month', e.target.value)}
-                required
-              />
-            </Field>
-
-            <Field label="Cable Buffer Multiplier">
-              <Input
-                type="number"
-                step="0.05"
-                value={form.cable_buffer_multiplier ?? '1.2'}
-                onChange={e => setVal('cable_buffer_multiplier', e.target.value)}
-                required
-              />
-            </Field>
-
-            <Field label="Max Inverter-to-MDB Dist (m)">
-              <Input
-                type="number"
-                step="1"
-                value={form.max_inverter_to_mdb_distance_m ?? '50'}
-                onChange={e => setVal('max_inverter_to_mdb_distance_m', e.target.value)}
-              />
-            </Field>
+            {SURVEY_CONSTANTS.map(c => <Field key={c.key} label={c.label} hint={c.hint}>
+              <Input type="number" step="any" min="0" value={form[c.key] ?? ''} onChange={e => setVal(c.key, e.target.value)} required />
+            </Field>)}
           </div>
-
-          <div className="pt-2 border-t border-slate-200">
-            <h3 className="text-sm font-semibold text-slate-800 mb-2">Default Tariff Category Rates (₹ / Unit)</h3>
+          <div className="border-t border-slate-200 pt-2">
+            <h3 className="mb-2 text-sm font-semibold text-slate-800">Tariff by category (₹ per unit)</h3>
             <div className="grid gap-4 sm:grid-cols-4">
-              <Field label="LT-1 Rate (₹)">
-                <Input
-                  type="number"
-                  step="0.1"
-                  value={form.tariff_lt1 ?? '4.5'}
-                  onChange={e => setVal('tariff_lt1', e.target.value)}
-                />
-              </Field>
-              <Field label="LT-2 Rate (₹)">
-                <Input
-                  type="number"
-                  step="0.1"
-                  value={form.tariff_lt2 ?? '7.0'}
-                  onChange={e => setVal('tariff_lt2', e.target.value)}
-                />
-              </Field>
-              <Field label="LT-3 Rate (₹)">
-                <Input
-                  type="number"
-                  step="0.1"
-                  value={form.tariff_lt3 ?? '9.5'}
-                  onChange={e => setVal('tariff_lt3', e.target.value)}
-                />
-              </Field>
-              <Field label="HT Rate (₹)">
-                <Input
-                  type="number"
-                  step="0.1"
-                  value={form.tariff_ht ?? '8.0'}
-                  onChange={e => setVal('tariff_ht', e.target.value)}
-                />
-              </Field>
+              {SURVEY_TARIFFS.map(c => <Field key={c.key} label={c.label}>
+                <Input type="number" step="any" min="0" value={form[c.key] ?? ''} onChange={e => setVal(c.key, e.target.value)} required />
+              </Field>)}
             </div>
           </div>
 

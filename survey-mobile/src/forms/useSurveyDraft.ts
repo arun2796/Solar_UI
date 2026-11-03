@@ -3,6 +3,7 @@ import { AppState } from 'react-native'
 import { useFocusEffect } from 'expo-router'
 import { surveyDrafts } from '../db'
 import { calculateSurvey } from '../lib/surveyCalculator'
+import { currentSurveySettings } from '../lib/surveySettings'
 import type {
   SurveyCalculations,
   SurveyDraft,
@@ -132,7 +133,8 @@ export function useSurveyDraft(localId?: string | string[]) {
         newSections.section3,
         newSections.section4,
         newSections.section5,
-        ovr
+        ovr,
+        currentSurveySettings()
       )
 
       // Also sync Section 9 auto-calculated values
@@ -142,7 +144,7 @@ export function useSurveyDraft(localId?: string | string[]) {
           ...newSections.section9,
           systemSizeKw: calcs.recommendedSystemSizeKw,
           numberOfPanels: calcs.numberOfPanels,
-          areaRequiredSqft: calcs.netFreeAreaSqft,
+          areaRequiredSqft: calcs.areaRequiredSqft,
           monthlyGenerationUnits: calcs.unitsGeneratedPerMonth,
           monthlySavingsRs: calcs.monthlySavingsRs,
           annualSavingsRs: calcs.annualSavingsRs,

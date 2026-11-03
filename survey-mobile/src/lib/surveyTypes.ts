@@ -185,6 +185,7 @@ export interface SurveyCalculations {
   capacityByRoofKw: number
   recommendedSystemSizeKw: number
   numberOfPanels: number
+  areaRequiredSqft: number
   unitsGeneratedPerMonth: number
   monthlySavingsRs: number
   annualSavingsRs: number
@@ -204,6 +205,7 @@ export interface SurveyPhotoLocal {
   longitude?: number | null
   capturedAt: string
   pending: number // 1 = pending upload, 0 = uploaded
+  serverId?: string | null // id of the uploaded photo on the server (needed to delete it there)
 }
 
 export type SurveyDraftSyncState = 'local' | 'syncing' | 'synced' | 'submitting' | 'submitted' | 'failed' | 'conflict'
@@ -233,6 +235,10 @@ export interface SurveyDraft {
   nextAttemptAt: string | null
   localUpdatedAt: string
   createdAt: string
+  /** Server photo ids removed on the phone, still to be deleted on the server. */
+  pendingPhotoDeletes?: string[]
+  /** 1 = the engineer chose "Send my version" after a conflict: the next upload replaces the office's changes. */
+  forceOverwrite?: number
 }
 
 export function defaultSurveySections(engineerName = ''): SurveySections {

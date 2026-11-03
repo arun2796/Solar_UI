@@ -5,7 +5,7 @@ import { surveyDrafts } from '../../../db'
 import type { SurveyDraft } from '../../../lib/surveyTypes'
 import { authStore } from '../../../lib/auth'
 import { syncStore } from '../../../lib/store'
-import { surveySyncEngine } from '../../../sync/surveySyncEngine'
+import { keepMyVersion, surveySyncEngine } from '../../../sync/surveySyncEngine'
 import { Button, Empty, Screen, StateBadge } from '../../../components/ui'
 import { colors, font, space } from '../../../theme'
 
@@ -99,6 +99,13 @@ export default function SurveyDraftsTab() {
               <Text style={{ color: colors.danger, fontSize: font.small, marginTop: 2, fontWeight: '600' }} numberOfLines={3}>
                 {d.lastError}
               </Text>
+            )}
+            {d.syncState === 'conflict' && (
+              <Button title="Send my version" variant="secondary" style={{ marginTop: space.sm }}
+                onPress={() => Alert.alert('Replace the office changes?', 'The copy on this phone will replace what the office changed in this survey.', [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Send my version', style: 'destructive', onPress: () => void keepMyVersion(d.localId).then(reload) },
+                ])} />
             )}
           </Pressable>
         )}

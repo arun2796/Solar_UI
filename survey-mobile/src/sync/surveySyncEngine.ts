@@ -1,7 +1,8 @@
-import { api, errorMessage, isNetworkError } from '../lib/api'
+import { api, errorMessage, isNetworkError, statusOf } from '../lib/api'
 import { currentUserId } from '../lib/auth'
 import { surveyDrafts, surveysCache } from '../db'
-import { TARIFF_RATES } from '../lib/surveyCalculator'
+import { shadowFreeSunHours, tariffRate } from '../lib/surveyCalculator'
+import { currentSurveySettings, refreshSurveySettings } from '../lib/surveySettings'
 import type { SurveyDraft, SurveyOverrides, SurveySections } from '../lib/surveyTypes'
 
 let running = false
@@ -28,11 +29,12 @@ export function sectionsToBackendData(sections: SurveySections) {
   const s8 = sections?.section8
   const s9 = sections?.section9
 
-  const tariffRate = s2?.tariffCategory ? TARIFF_RATES[s2.tariffCategory] || 7.0 : 7.0
+  const tariff = tariffRate(s2?.tariffCategory, currentSurveySettings())   // the admin's rate for the category
 
-  const sun8to10 = s4?.sunExposure8to10 ? 2 : 0
-  const sun10to2 = s4?.sunExposure10to2 ? 4 : 0
-  const sun2to5 = s4?.sunExposure2to5 ? 3 : 0
+  const sunHours = shadowFreeSunHours(s4)           // null = not entered (no shadow flag from it)
+  const sun8to10 = sunHours == null ? null : s4?.sunExposure8to10 ? 2 : 0
+  const sun10to2 = sunHours == null ? null : s4?.sunExposure10to2 ? 4 : 0
+  const sun2to5 = sunHours == null ? null : s4?.sunExposure2to5 ? 3 : 0
 
   return {
     section0: {
@@ -61,7 +63,7 @@ export function sectionsToBackendData(sections: SurveySections) {
       phaseType: s2?.phaseType === '1-phase' ? 'Single' : 'Three',
       monthlyBillRs: s2?.monthlyBillRs ?? null,
       tariffCategory: s2?.tariffCategory ?? 'LT-2',
-      tariffRateRsPerUnit: tariffRate,
+      tariffRateRsPerUnit: tariff,
       netMeteringAvailable: s2?.netMetering ? 'YES' : 'NO',
       units24Months: s2?.history24MonthsUnits ?? null,
       amountPaid24Months: s2?.history24MonthsAmount ?? null,
@@ -88,7 +90,7 @@ export function sectionsToBackendData(sections: SurveySections) {
       sunExposure8To10AmHours: sun8to10,
       sunExposure10AmTo2PmHours: sun10to2,
       sunExposure2To5PmHours: sun2to5,
-      totalShadowFreeSunHours: sun8to10 + sun10to2 + sun2to5,
+      totalShadowFreeSunHours: sunHours,
     },
     section5: {
       mdbLocation: s5?.mdbLocation ?? null,
@@ -121,13 +123,13 @@ export function sectionsToBackendData(sections: SurveySections) {
       customerRepName: s1?.contactPerson ?? null,
     },
     section9: {
-      verdict: s9?.verdict ?? 'FEASIBLE',
+      verdict: s9?.verdict || null,                 // never invent a verdict: Submit requires the engineer's choice
       systemSizeKw: s9?.systemSizeKw ?? null,
       numberOfPanels: s9?.numberOfPanels ?? null,
       areaRequiredSqft: s9?.areaRequiredSqft ?? null,
       panelWp: s9?.panelWp ?? 550,
       unitsPerMonth: s9?.monthlyGenerationUnits ?? null,
-      tariffRate,
+      tariffRate: tariff,
       monthlySavingsRs: s9?.monthlySavingsRs ?? null,
       annualSavingsRs: s9?.annualSavingsRs ?? null,
       recommendationNote: s9?.recommendationNote ?? null,
@@ -160,10 +162,11 @@ export async function runSurveySync(): Promise<void> {
       queued = false
       const list = await surveyDrafts.all(owner)
       for (const d of list) {
-        if (d.syncState === 'submitted') continue
+        if (d.syncState === 'submitted' || d.syncState === 'conflict') continue   // a conflict waits for the engineer's choice
         await syncOneSurvey(d)
       }
 
+      await refreshSurveySettings()                // the admin may have changed the calculation constants
       // Also pull latest server surveys for local cache
       try {
         const paged = await api.surveys.list({ pageSize: 50 })
@@ -179,12 +182,51 @@ export async function runSurveySync(): Promise<void> {
   }
 }
 
+/** After a conflict: the engineer chose to replace the office's changes with the copy on this phone. */
+export async function keepMyVersion(localId: string) {
+  await surveyDrafts.patch(localId, { syncState: 'local', forceOverwrite: 1, lastError: null })
+  scheduleSurveySync(0)
+}
+
+const CONFLICT_MESSAGE = 'Changed in the office after your last sync. Your copy is kept on this phone. Ask the office, or tap "Send my version" to replace their changes.'
+
+/** null and undefined are the same; numbers compare by value. Used to recognise our own earlier write on the server. */
+function sameData(a: unknown, b: unknown): boolean {
+  if (a == null || b == null) return a == null && b == null
+  if (typeof a === 'number' || typeof b === 'number') return Number(a) === Number(b)
+  if (Array.isArray(a) || Array.isArray(b)) {
+    return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((x, i) => sameData(x, b[i]))
+  }
+  if (typeof a === 'object' && typeof b === 'object') {
+    const keys = new Set([...Object.keys(a as object), ...Object.keys(b as object)])
+    return [...keys].every(k => sameData((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]))
+  }
+  return a === b
+}
+
+/**
+ * Runs a versioned write. On 409 the server copy is compared with what we are sending: identical means our own earlier
+ * write whose reply was lost (retry with the new version); different means the office changed it (conflict), unless the
+ * engineer already chose "Send my version".
+ */
+async function versioned<T>(d: SurveyDraft, serverId: string, version: number, data: unknown, write: (v: number) => Promise<T>): Promise<T | 'conflict'> {
+  try {
+    return await write(version)
+  } catch (err) {
+    if (statusOf(err) !== 409) throw err
+    const remote = await api.surveys.get(serverId)
+    if (d.forceOverwrite === 1 || sameData(remote?.data, data)) return await write(remote?.version > 0 ? remote.version : 1)
+    await surveyDrafts.patch(d.localId, { syncState: 'conflict', submitRequested: 0, lastError: CONFLICT_MESSAGE })
+    return 'conflict'
+  }
+}
+
 async function syncOneSurvey(d: SurveyDraft) {
   try {
     let serverId = d.serverId
     let version = d.version
 
-    // 1. Create on server if not yet created
+    // 1. Create on server if not yet created (idempotent on the device's localId)
     if (!serverId) {
       await surveyDrafts.patch(d.localId, { syncState: 'syncing' })
       const s0 = d.sections?.section0
@@ -198,140 +240,82 @@ async function syncOneSurvey(d: SurveyDraft) {
         gpsLatitude: s0?.gpsLat ?? null,
         gpsLongitude: s0?.gpsLng ?? null,
       })
-      serverId = createRes.survey.id
+      serverId = createRes.survey.id as string
       version = createRes.survey.version
-      await surveyDrafts.patch(d.localId, {
-        serverId,
-        version,
-        surveyNumber: createRes.survey.surveyRef,
-        syncState: 'local',
-      })
+      await surveyDrafts.patch(d.localId, { serverId, version, surveyNumber: createRes.survey.surveyRef, syncState: 'local' })
     }
-
-    // Ensure version is at least 1 when serverId is present
-    if (serverId && (!version || version < 1)) {
-      try {
-        const remote = await api.surveys.get(serverId)
-        version = remote?.version && remote.version > 0 ? remote.version : 1
-      } catch {
-        version = 1
-      }
+    if (!version || version < 1) {
+      const remote = await api.surveys.get(serverId)
+      version = remote?.version > 0 ? remote.version : 1
       await surveyDrafts.patch(d.localId, { version })
     }
 
-    // 2. Upload updated draft fields if dirty
-    if (serverId && d.dirty === 1) {
+    // 2. Fields. editSeq is read before sending: edits typed during the upload keep the draft dirty.
+    if (d.dirty === 1 && d.submitRequested !== 1) {
       await surveyDrafts.patch(d.localId, { syncState: 'syncing' })
-      const dataDto = sectionsToBackendData(d.sections)
-      const ovrDto = overridesToBackendDto(d.overrides)
-      const safeVersion = version && version > 0 ? version : 1
-      try {
-        const updated = await api.surveys.update(serverId, safeVersion, dataDto, ovrDto)
-        version = updated.version
-        await surveyDrafts.patch(d.localId, {
-          version,
-          dirty: 0,
-          syncState: 'synced',
-          lastError: null,
-        })
-      } catch (err: any) {
-        if (err?.response?.status === 409) {
-          const remote = await api.surveys.get(serverId)
-          const newVersion = remote?.version && remote.version > 0 ? remote.version : 1
-          const updated = await api.surveys.update(serverId, newVersion, dataDto, ovrDto)
-          version = updated.version
-          await surveyDrafts.patch(d.localId, {
-            version,
-            dirty: 0,
-            syncState: 'synced',
-            lastError: null,
-          })
-        } else {
-          throw err
-        }
+      const editSeq = d.editSeq
+      const data = sectionsToBackendData(d.sections)
+      const res = await versioned(d, serverId, version, data, v => api.surveys.update(serverId!, v, data, overridesToBackendDto(d.overrides)))
+      if (res === 'conflict') return
+      version = res.version
+      await surveyDrafts.ackFields(d.localId, editSeq, version)
+    }
+
+    // 3. Signatures
+    for (const kind of ['engineer', 'customer'] as const) {
+      const pending = kind === 'engineer' ? d.engineerSigPending : d.customerSigPending
+      const uri = kind === 'engineer' ? d.engineerSigUri : d.customerSigUri
+      if (pending === 1 && uri) {
+        await api.surveys.signature(serverId, kind, uri)
+        await surveyDrafts.patch(d.localId, kind === 'engineer' ? { engineerSigPending: 0 } : { customerSigPending: 0 })
       }
     }
 
-    // 3. Upload engineer signature if pending
-    if (serverId && d.engineerSigPending === 1 && d.engineerSigUri) {
-      try {
-        await api.surveys.signature(serverId, 'engineer', d.engineerSigUri)
-        await surveyDrafts.patch(d.localId, { engineerSigPending: 0 })
-      } catch (err) {
-        if (!isNetworkError(err)) throw err
-      }
+    // 4. Photos: deletions first, then each new photo exactly once (its server id is remembered).
+    for (const photoId of d.pendingPhotoDeletes ?? []) {
+      try { await api.surveys.deletePhoto(serverId, photoId) } catch (err) { if (statusOf(err) !== 404) throw err }
+      await surveyDrafts.ackPhotoDelete(d.localId, photoId)
     }
-
-    // 4. Upload customer signature if pending
-    if (serverId && d.customerSigPending === 1 && d.customerSigUri) {
-      try {
-        await api.surveys.signature(serverId, 'customer', d.customerSigUri)
-        await surveyDrafts.patch(d.localId, { customerSigPending: 0 })
-      } catch (err) {
-        if (!isNetworkError(err)) throw err
-      }
-    }
-
-    // 5. Upload pending photos
-    if (serverId && d.photos && d.photos.length > 0) {
-      for (const p of d.photos) {
-        if (p.pending === 1 && p.localUri) {
-          try {
-            const sectionNum = mapSectionToNumber(p.section)
-            await api.surveys.photo(serverId, {
-              sectionNumber: sectionNum,
-              tag: p.section,
-              caption: p.caption,
-              latitude: p.latitude,
-              longitude: p.longitude,
-              takenAt: p.capturedAt,
-              fileUri: p.localUri,
-            })
-            // Mark photo pending = 0 in SQLite
-            const updatedPhotos = d.photos.map((item: any) =>
-              item.id === p.id ? { ...item, pending: 0 } : item
-            )
-            await surveyDrafts.saveSections(d.localId, d.sections, d.overrides, d.calculations)
-            // Update photo list directly
-            await surveyDrafts.patch(d.localId, { syncState: 'synced' })
-          } catch (err) {
-            if (!isNetworkError(err)) throw err
-          }
-        }
-      }
-    }
-
-    // 6. Submit final if requested
-    if (serverId && d.submitRequested === 1) {
-      await surveyDrafts.patch(d.localId, { syncState: 'submitting' })
-      const dataDto = sectionsToBackendData(d.sections)
-      const ovrDto = overridesToBackendDto(d.overrides)
-      let submitted: any
-      const safeVersion = version && version > 0 ? version : 1
-      try {
-        submitted = await api.surveys.submit(serverId, safeVersion, dataDto, ovrDto)
-      } catch (err: any) {
-        if (err?.response?.status === 409) {
-          const remote = await api.surveys.get(serverId)
-          const newVersion = remote?.version && remote.version > 0 ? remote.version : 1
-          submitted = await api.surveys.submit(serverId, newVersion, dataDto, ovrDto)
-        } else {
-          throw err
-        }
-      }
-      await surveyDrafts.patch(d.localId, {
-        version: submitted.version,
-        syncState: 'submitted',
-        submitRequested: 0,
-        surveyNumber: submitted.surveyRef,
-        lastError: null,
+    for (const p of d.photos ?? []) {
+      if (p.pending !== 1 || !p.localUri) continue
+      const uploaded = await api.surveys.photo(serverId, {
+        sectionNumber: mapSectionToNumber(p.section),
+        tag: p.section,
+        caption: p.caption,
+        latitude: p.latitude,
+        longitude: p.longitude,
+        takenAt: p.capturedAt,
+        fileUri: p.localUri,
       })
+      await surveyDrafts.ackPhoto(d.localId, p.id, uploaded?.id ?? null)
+    }
+
+    // 5. Submit, only after every photo and signature is on the server (any failure above skips this and is retried).
+    if (d.submitRequested === 1) {
+      await surveyDrafts.patch(d.localId, { syncState: 'submitting' })
+      const editSeq = d.editSeq
+      const data = sectionsToBackendData(d.sections)
+      try {
+        const submitted = await versioned(d, serverId, version, data, v => api.surveys.submit(serverId!, v, data, overridesToBackendDto(d.overrides)))
+        if (submitted === 'conflict') return
+        await surveyDrafts.ackFields(d.localId, editSeq, submitted.version)
+        await surveyDrafts.patch(d.localId, { syncState: 'submitted', submitRequested: 0, surveyNumber: submitted.surveyRef, lastError: null })
+      } catch (err) {
+        // The server refused the survey as it is (missing verdict, signature, invalid value): back to a draft the engineer can fix.
+        if (statusOf(err) === 400 || statusOf(err) === 422) {
+          await surveyDrafts.patch(d.localId, { syncState: 'local', submitRequested: 0, lastError: `Not submitted: ${errorMessage(err)}` })
+          return
+        }
+        throw err
+      }
+    } else if (d.dirty !== 1) {
+      await surveyDrafts.patch(d.localId, { syncState: 'synced', lastError: null })
     }
   } catch (err) {
-    const msg = errorMessage(err)
+    // Offline or server unreachable: keep the work and try again later. Anything else needs the engineer's attention.
     await surveyDrafts.patch(d.localId, {
-      syncState: 'failed',
-      lastError: msg,
+      syncState: isNetworkError(err) ? (d.submitRequested === 1 ? 'submitting' : 'local') : 'failed',
+      lastError: isNetworkError(err) ? null : errorMessage(err),
     })
   }
 }

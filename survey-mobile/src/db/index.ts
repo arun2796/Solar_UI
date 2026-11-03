@@ -568,6 +568,7 @@ export const surveyDrafts = {
     if (!s) return
     const target = (s.photos || []).find(p => p.id === photoId)
     if (target?.localUri) deleteFile(target.localUri)
+    if (target?.serverId) s.pendingPhotoDeletes = [...(s.pendingPhotoDeletes || []), target.serverId]   // already uploaded: delete it there too
     s.photos = (s.photos || []).filter(p => p.id !== photoId)
     s.dirty = 1
     s.editSeq = (s.editSeq || 0) + 1
@@ -581,6 +582,41 @@ export const surveyDrafts = {
     const s = store.surveyDrafts[localId]
     if (!s) return
     Object.assign(s, p)
+    await persistNow()
+  },
+
+  /**
+   * The server accepted the fields sent at `editSeq`. The draft is clean only if nothing was edited meanwhile;
+   * otherwise it stays dirty so the newer edits go up on the next sync.
+   */
+  async ackFields(localId: string, editSeq: number, version: number) {
+    const store = await getStore()
+    const s = store.surveyDrafts[localId]
+    if (!s) return
+    s.version = version
+    s.lastError = null
+    s.forceOverwrite = 0
+    if (s.editSeq === editSeq) {
+      s.dirty = 0
+      if (s.syncState !== 'submitting' && s.submitRequested !== 1) s.syncState = 'synced'
+    }
+    await persistNow()
+  },
+
+  /** A photo reached the server: never upload it again, and remember its server id. */
+  async ackPhoto(localId: string, photoId: string, serverPhotoId: string | null) {
+    const store = await getStore()
+    const s = store.surveyDrafts[localId]
+    if (!s) return
+    s.photos = (s.photos || []).map(p => (p.id === photoId ? { ...p, pending: 0, serverId: serverPhotoId } : p))
+    await persistNow()
+  },
+
+  async ackPhotoDelete(localId: string, serverPhotoId: string) {
+    const store = await getStore()
+    const s = store.surveyDrafts[localId]
+    if (!s) return
+    s.pendingPhotoDeletes = (s.pendingPhotoDeletes || []).filter(id => id !== serverPhotoId)
     await persistNow()
   },
 
