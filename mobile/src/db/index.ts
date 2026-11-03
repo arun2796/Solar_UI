@@ -1,6 +1,7 @@
-import * as SQLite from 'expo-sqlite'
-import { File } from 'expo-file-system'
+import * as FileSystem from 'expo-file-system/legacy'
 import type { Client, ReportFields } from '../lib/types'
+import type { SurveyCalculations, SurveyDraft, SurveyOverrides, SurveyPhotoLocal, SurveySections } from '../lib/surveyTypes'
+export type { SurveyDraft }
 
 /**
  * local       edited on the device, not yet (fully) on the server
@@ -40,139 +41,538 @@ export type Draft = {
   createdAt: string
 }
 
-type Row = Omit<Draft, 'fields'> & { fields: string }
-
-let _db: Promise<SQLite.SQLiteDatabase> | null = null
-export function db(): Promise<SQLite.SQLiteDatabase> {
-  if (!_db) _db = open()
-  return _db
+interface StoreData {
+  drafts: Record<string, Draft>
+  clients: Record<string, Client>
+  meta: Record<string, string>
+  surveyDrafts: Record<string, SurveyDraft>
+  surveys: Record<string, any>
 }
 
-async function open(): Promise<SQLite.SQLiteDatabase> {
-  const d = await SQLite.openDatabaseAsync('solar-maintenance.db')
-  await d.execAsync(`
-    pragma journal_mode = wal;
-    create table if not exists drafts (
-      localId text primary key, ownerUserId text, serverId text, clientId text not null, clientName text not null, fields text not null,
-      version integer not null default 0, dirty integer not null default 1, editSeq integer not null default 0, serverFieldsJson text,
-      syncState text not null default 'local',
-      engineerSigUri text, engineerSigPending integer not null default 0, clientSigUri text, clientSigPending integer not null default 0,
-      submitRequested integer not null default 0, reportRef text, nextVisitDate text, lastError text, attempts integer not null default 0,
-      nextAttemptAt text, conflictJson text, localUpdatedAt text not null, createdAt text not null);
-    create table if not exists clients_cache (id text primary key, json text not null, cachedAt text not null);
-    create table if not exists meta (key text primary key, value text);
-  `)
-  // Upgrade databases created by older app versions (add columns introduced later).
-  const cols = new Set((await d.getAllAsync<{ name: string }>('pragma table_info(drafts)')).map(c => c.name))
-  const add: [string, string][] = [['ownerUserId', 'text'], ['editSeq', 'integer not null default 0'], ['serverFieldsJson', 'text']]
-  for (const [name, type] of add) if (!cols.has(name)) await d.execAsync(`alter table drafts add column ${name} ${type}`)
-  return d
-}
+let _store: StoreData | null = null
+let _initPromise: Promise<StoreData> | null = null
 
-const parse = (r: Row): Draft => ({ ...r, fields: JSON.parse(r.fields) as ReportFields })
 const now = () => new Date().toISOString()
-const deleteFile = (uri?: string | null) => { if (!uri) return; try { const f = new File(uri); if (f.exists) f.delete() } catch { /* already gone */ } }
+const DB_FILE = `${FileSystem.documentDirectory || ''}solar-maintenance-data.json`
+
+const deleteFile = (uri?: string | null) => {
+  if (!uri) return
+  try {
+    FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {})
+  } catch {
+    /* already gone */
+  }
+}
+
+async function getStore(): Promise<StoreData> {
+  if (_store) return _store
+  if (!_initPromise) {
+    _initPromise = (async () => {
+      let data: StoreData = {
+        drafts: {},
+        clients: {},
+        meta: {},
+        surveyDrafts: {},
+        surveys: {},
+      }
+      try {
+        if (FileSystem.documentDirectory) {
+          const info = await FileSystem.getInfoAsync(DB_FILE)
+          if (info.exists) {
+            const raw = await FileSystem.readAsStringAsync(DB_FILE)
+            if (raw && raw.trim().length > 0) {
+              const parsed = JSON.parse(raw)
+              data = {
+                drafts: parsed.drafts || {},
+                clients: parsed.clients || {},
+                meta: parsed.meta || {},
+                surveyDrafts: parsed.surveyDrafts || {},
+                surveys: parsed.surveys || {},
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[Storage] Failed to read store file, starting fresh', err)
+      }
+      _store = data
+      return _store
+    })()
+  }
+  return _initPromise
+}
+
+async function persistNow() {
+  if (!_store) return
+  try {
+    if (FileSystem.documentDirectory) {
+      const json = JSON.stringify(_store)
+      await FileSystem.writeAsStringAsync(DB_FILE, json)
+    }
+  } catch (err) {
+    console.warn('[Storage] Failed to persist store file', err)
+  }
+}
+
+export function db(): Promise<any> {
+  return Promise.resolve({
+    runAsync: async () => ({ lastInsertRowId: 0, changes: 0 }),
+    getAllAsync: async () => [],
+    getFirstAsync: async () => null,
+    execAsync: async () => {},
+    withTransactionAsync: async (cb: any) => cb(),
+  })
+}
 
 export const drafts = {
   async all(owner: string): Promise<Draft[]> {
-    const rows = await (await db()).getAllAsync<Row>('select * from drafts where ownerUserId = ? order by localUpdatedAt desc', owner)
-    return rows.map(parse)
+    const store = await getStore()
+    return Object.values(store.drafts)
+      .filter(d => d.ownerUserId === owner)
+      .sort((a, b) => (b.localUpdatedAt || '').localeCompare(a.localUpdatedAt || ''))
+      .map(d => ({ ...d }))
   },
-  async get(localId: string): Promise<Draft | null> { const r = await (await db()).getFirstAsync<Row>('select * from drafts where localId = ?', localId); return r ? parse(r) : null },
-  async create(d: Pick<Draft, 'localId' | 'clientId' | 'clientName' | 'fields' | 'ownerUserId'>): Promise<Draft> {
-    const t = now()
-    await (await db()).runAsync('insert into drafts (localId, ownerUserId, clientId, clientName, fields, localUpdatedAt, createdAt) values (?,?,?,?,?,?,?)',
-      d.localId, d.ownerUserId, d.clientId, d.clientName, JSON.stringify(d.fields), t, t)
-    return (await this.get(d.localId))!
-  },
-  /** Drafts created before owners were recorded belong to whoever signs in first after the upgrade. */
-  async claimOrphans(owner: string) { await (await db()).runAsync('update drafts set ownerUserId = ? where ownerUserId is null', owner) },
 
-  /** Autosave: stores fields, marks dirty, bumps editSeq. Locked drafts are never changed. */
-  async saveFields(localId: string, fields: ReportFields) {
-    await (await db()).runAsync(`update drafts set fields = ?, dirty = 1, editSeq = editSeq + 1, localUpdatedAt = ?,
-      syncState = case when syncState in ('synced','failed') then 'local' else syncState end
-      where localId = ? and syncState not in ('submitting','submitted','conflict','elsewhere')`, JSON.stringify(fields), now(), localId)
+  async get(localId: string): Promise<Draft | null> {
+    if (!localId || localId === 'new') return null
+    const store = await getStore()
+    const d = store.drafts[localId]
+    return d ? { ...d } : null
   },
-  async setSignature(localId: string, kind: 'engineer' | 'client', uri: string) {
-    const col = kind === 'engineer' ? 'engineerSig' : 'clientSig'
-    const before = await this.get(localId)
-    if (!before || LOCKED_STATES.includes(before.syncState)) { deleteFile(uri); return false }
-    await (await db()).runAsync(`update drafts set ${col}Uri = ?, ${col}Pending = 1, editSeq = editSeq + 1, localUpdatedAt = ?,
-      syncState = case when syncState in ('synced','failed') then 'local' else syncState end where localId = ?`, uri, now(), localId)
-    const old = kind === 'engineer' ? before.engineerSigUri : before.clientSigUri
+
+  async create(d: Pick<Draft, 'localId' | 'clientId' | 'clientName' | 'fields' | 'ownerUserId'>): Promise<Draft> {
+    const store = await getStore()
+    const t = now()
+    const item: Draft = {
+      localId: d.localId,
+      ownerUserId: d.ownerUserId ?? null,
+      serverId: null,
+      clientId: d.clientId,
+      clientName: d.clientName,
+      fields: d.fields,
+      version: 0,
+      dirty: 1,
+      editSeq: 0,
+      serverFieldsJson: null,
+      syncState: 'local',
+      engineerSigUri: null,
+      engineerSigPending: 0,
+      clientSigUri: null,
+      clientSigPending: 0,
+      submitRequested: 0,
+      reportRef: null,
+      nextVisitDate: null,
+      lastError: null,
+      attempts: 0,
+      nextAttemptAt: null,
+      conflictJson: null,
+      localUpdatedAt: t,
+      createdAt: t,
+    }
+    store.drafts[d.localId] = item
+    await persistNow()
+    return { ...item }
+  },
+
+  async claimOrphans(owner: string) {
+    const store = await getStore()
+    let changed = false
+    for (const d of Object.values(store.drafts)) {
+      if (d.ownerUserId === null) {
+        d.ownerUserId = owner
+        changed = true
+      }
+    }
+    if (changed) await persistNow()
+  },
+
+  async saveFields(localId: string, fields: ReportFields) {
+    const store = await getStore()
+    const d = store.drafts[localId]
+    if (!d || LOCKED_STATES.includes(d.syncState)) return
+    d.fields = fields
+    d.dirty = 1
+    d.editSeq = (d.editSeq || 0) + 1
+    d.localUpdatedAt = now()
+    if (d.syncState === 'synced' || d.syncState === 'failed') {
+      d.syncState = 'local'
+    }
+    await persistNow()
+  },
+
+  async setSignature(localId: string, kind: 'engineer' | 'client', uri: string): Promise<boolean> {
+    const store = await getStore()
+    const d = store.drafts[localId]
+    if (!d || LOCKED_STATES.includes(d.syncState)) {
+      deleteFile(uri)
+      return false
+    }
+    const old = kind === 'engineer' ? d.engineerSigUri : d.clientSigUri
     if (old && old !== uri) deleteFile(old)
+
+    if (kind === 'engineer') {
+      d.engineerSigUri = uri
+      d.engineerSigPending = 1
+    } else {
+      d.clientSigUri = uri
+      d.clientSigPending = 1
+    }
+    d.editSeq = (d.editSeq || 0) + 1
+    d.localUpdatedAt = now()
+    if (d.syncState === 'synced' || d.syncState === 'failed') {
+      d.syncState = 'local'
+    }
+    await persistNow()
     return true
   },
-  /** Unconditional bookkeeping update (server ids, versions, states). */
+
   async patch(localId: string, p: Partial<Omit<Draft, 'fields'>> & { fields?: ReportFields }) {
-    const cols: string[] = []; const vals: SQLite.SQLiteBindValue[] = []
-    for (const [k, v] of Object.entries(p)) { cols.push(`${k} = ?`); vals.push(k === 'fields' ? JSON.stringify(v) : (v as SQLite.SQLiteBindValue)) }
-    if (!cols.length) return
-    vals.push(localId)
-    await (await db()).runAsync(`update drafts set ${cols.join(', ')} where localId = ?`, ...vals)
+    const store = await getStore()
+    const d = store.drafts[localId]
+    if (!d) return
+    Object.assign(d, p)
+    await persistNow()
   },
-  /** Clears `dirty` only if no edit happened since `editSeq` was read. Returns false when the draft changed meanwhile. */
+
   async ackFields(localId: string, editSeq: number, version: number, serverFieldsJson: string): Promise<boolean> {
-    const r = await (await db()).runAsync('update drafts set dirty = 0, version = ?, serverFieldsJson = ? where localId = ? and editSeq = ?', version, serverFieldsJson, localId, editSeq)
-    if (r.changes === 0) await (await db()).runAsync('update drafts set version = ?, serverFieldsJson = ? where localId = ?', version, serverFieldsJson, localId)
-    return r.changes > 0
+    const store = await getStore()
+    const d = store.drafts[localId]
+    if (!d) return false
+    if (d.editSeq === editSeq) {
+      d.dirty = 0
+      d.version = version
+      d.serverFieldsJson = serverFieldsJson
+      await persistNow()
+      return true
+    } else {
+      d.version = version
+      d.serverFieldsJson = serverFieldsJson
+      await persistNow()
+      return false
+    }
   },
-  /** Clears a signature's pending flag only if the uploaded file is still the current one. */
+
   async ackSignature(localId: string, kind: 'engineer' | 'client', uploadedUri: string) {
-    const col = kind === 'engineer' ? 'engineerSig' : 'clientSig'
-    await (await db()).runAsync(`update drafts set ${col}Pending = 0 where localId = ? and ${col}Uri = ?`, localId, uploadedUri)
+    const store = await getStore()
+    const d = store.drafts[localId]
+    if (!d) return
+    if (kind === 'engineer' && d.engineerSigUri === uploadedUri) {
+      d.engineerSigPending = 0
+    } else if (kind === 'client' && d.clientSigUri === uploadedUri) {
+      d.clientSigPending = 0
+    }
+    await persistNow()
   },
-  /** Marks synced only if nothing changed and nothing is pending. */
+
   async markSyncedIfClean(localId: string, editSeq: number) {
-    await (await db()).runAsync(`update drafts set syncState = 'synced', attempts = 0, nextAttemptAt = null, lastError = null
-      where localId = ? and editSeq = ? and dirty = 0 and engineerSigPending = 0 and clientSigPending = 0 and submitRequested = 0`, localId, editSeq)
+    const store = await getStore()
+    const d = store.drafts[localId]
+    if (!d) return
+    if (d.editSeq === editSeq && d.dirty === 0 && d.engineerSigPending === 0 && d.clientSigPending === 0 && d.submitRequested === 0) {
+      d.syncState = 'synced'
+      d.attempts = 0
+      d.nextAttemptAt = null
+      d.lastError = null
+      await persistNow()
+    }
   },
+
   async remove(localId: string) {
-    const d = await this.get(localId)
-    await (await db()).runAsync('delete from drafts where localId = ?', localId)
-    deleteFile(d?.engineerSigUri); deleteFile(d?.clientSigUri)
+    const store = await getStore()
+    const d = store.drafts[localId]
+    if (d) {
+      deleteFile(d.engineerSigUri)
+      deleteFile(d.clientSigUri)
+      delete store.drafts[localId]
+      await persistNow()
+    }
   },
+
   async pending(owner: string): Promise<Draft[]> {
-    const rows = await (await db()).getAllAsync<Row>(`select * from drafts where ownerUserId = ? and syncState not in ('submitted','conflict','elsewhere','failed')
-      and (serverId is null or dirty = 1 or engineerSigPending = 1 or clientSigPending = 1 or submitRequested = 1) order by createdAt`, owner)
-    return rows.map(parse)
+    const store = await getStore()
+    return Object.values(store.drafts)
+      .filter(d =>
+        d.ownerUserId === owner &&
+        !['submitted', 'conflict', 'elsewhere', 'failed'].includes(d.syncState) &&
+        (d.serverId === null || d.dirty === 1 || d.engineerSigPending === 1 || d.clientSigPending === 1 || d.submitRequested === 1)
+      )
+      .sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''))
+      .map(d => ({ ...d }))
   },
-  /** Earliest scheduled retry among this user's pending drafts (ISO), if any. */
+
   async nextRetryAt(owner: string): Promise<string | null> {
-    const r = await (await db()).getFirstAsync<{ t: string | null }>(`select min(nextAttemptAt) as t from drafts where ownerUserId = ? and nextAttemptAt is not null and syncState not in ('submitted','conflict','elsewhere','failed')`, owner)
-    return r?.t ?? null
+    const store = await getStore()
+    const times = Object.values(store.drafts)
+      .filter(d => d.ownerUserId === owner && d.nextAttemptAt && !['submitted', 'conflict', 'elsewhere', 'failed'].includes(d.syncState))
+      .map(d => d.nextAttemptAt!)
+    if (!times.length) return null
+    times.sort()
+    return times[0]
   },
-  /** Manual retry: failed drafts go back to the queue, and every backoff is reset. Queued submits stay queued. */
+
   async retryNow(owner: string) {
-    await (await db()).runAsync(`update drafts set syncState = case when submitRequested = 1 then 'submitting' else 'local' end, attempts = 0, nextAttemptAt = null, lastError = null
-      where ownerUserId = ? and syncState = 'failed'`, owner)
-    await (await db()).runAsync(`update drafts set attempts = 0, nextAttemptAt = null where ownerUserId = ? and nextAttemptAt is not null`, owner)
+    const store = await getStore()
+    let changed = false
+    for (const d of Object.values(store.drafts)) {
+      if (d.ownerUserId === owner) {
+        if (d.syncState === 'failed') {
+          d.syncState = d.submitRequested === 1 ? 'submitting' : 'local'
+          d.attempts = 0
+          d.nextAttemptAt = null
+          d.lastError = null
+          changed = true
+        }
+        if (d.nextAttemptAt !== null) {
+          d.attempts = 0
+          d.nextAttemptAt = null
+          changed = true
+        }
+      }
+    }
+    if (changed) await persistNow()
   },
-  async countFailed(owner: string) { return (await (await db()).getFirstAsync<{ n: number }>(`select count(*) as n from drafts where ownerUserId = ? and syncState = 'failed'`, owner))?.n ?? 0 },
-  async countUnsynced(owner: string) {
-    return (await (await db()).getFirstAsync<{ n: number }>(`select count(*) as n from drafts where ownerUserId = ? and syncState not in ('synced','submitted','elsewhere')`, owner))?.n ?? 0
+
+  async countFailed(owner: string): Promise<number> {
+    const store = await getStore()
+    return Object.values(store.drafts).filter(d => d.ownerUserId === owner && d.syncState === 'failed').length
+  },
+
+  async countUnsynced(owner: string): Promise<number> {
+    const store = await getStore()
+    return Object.values(store.drafts).filter(d => d.ownerUserId === owner && !['synced', 'submitted', 'elsewhere'].includes(d.syncState)).length
   },
 }
 
 export const clientsCache = {
-  /** Replaces the cache with the full server list (prunes clients that were removed or deactivated). */
   async replaceAll(list: Client[]) {
-    const d = await db(); const t = now()
-    await d.withTransactionAsync(async () => {
-      await d.runAsync('delete from clients_cache')
-      for (const c of list) await d.runAsync('insert or replace into clients_cache (id, json, cachedAt) values (?,?,?)', c.id, JSON.stringify(c), t)
-    })
+    const store = await getStore()
+    store.clients = {}
+    for (const c of list) {
+      store.clients[c.id] = c
+    }
+    await persistNow()
   },
+
   async put(list: Client[]) {
-    const d = await db(); const t = now()
-    await d.withTransactionAsync(async () => { for (const c of list) await d.runAsync('insert or replace into clients_cache (id, json, cachedAt) values (?,?,?)', c.id, JSON.stringify(c), t) })
+    const store = await getStore()
+    for (const c of list) {
+      store.clients[c.id] = c
+    }
+    await persistNow()
   },
-  async all(): Promise<Client[]> { const rows = await (await db()).getAllAsync<{ json: string }>('select json from clients_cache'); return rows.map(r => JSON.parse(r.json) as Client).sort((a, b) => a.name.localeCompare(b.name)) },
-  async get(id: string): Promise<Client | null> { const r = await (await db()).getFirstAsync<{ json: string }>('select json from clients_cache where id = ?', id); return r ? (JSON.parse(r.json) as Client) : null },
+
+  async all(): Promise<Client[]> {
+    const store = await getStore()
+    return Object.values(store.clients).sort((a, b) => a.name.localeCompare(b.name))
+  },
+
+  async get(id: string): Promise<Client | null> {
+    const store = await getStore()
+    return store.clients[id] ?? null
+  },
 }
 
 export const meta = {
-  async get(key: string) { return (await (await db()).getFirstAsync<{ value: string }>('select value from meta where key = ?', key))?.value ?? null },
-  async set(key: string, value: string) { await (await db()).runAsync('insert or replace into meta (key, value) values (?, ?)', key, value) },
+  async get(key: string): Promise<string | null> {
+    const store = await getStore()
+    return store.meta[key] ?? null
+  },
+
+  async set(key: string, value: string) {
+    const store = await getStore()
+    store.meta[key] = value
+    await persistNow()
+  },
+}
+
+export const surveyDrafts = {
+  async all(owner: string): Promise<SurveyDraft[]> {
+    const store = await getStore()
+    return Object.values(store.surveyDrafts)
+      .filter(s => s.ownerUserId === owner)
+      .sort((a, b) => (b.localUpdatedAt || '').localeCompare(a.localUpdatedAt || ''))
+      .map(s => ({ ...s }))
+  },
+
+  async get(localId: string): Promise<SurveyDraft | null> {
+    if (!localId || localId === 'new') return null
+    const store = await getStore()
+    const s = store.surveyDrafts[localId]
+    return s ? { ...s } : null
+  },
+
+  async create(d: {
+    localId: string
+    ownerUserId: string | null
+    customerName: string
+    siteAddress: string
+    sections: SurveySections
+  }): Promise<SurveyDraft> {
+    const store = await getStore()
+    const t = now()
+    const item: SurveyDraft = {
+      localId: d.localId,
+      ownerUserId: d.ownerUserId ?? null,
+      serverId: null,
+      surveyNumber: null,
+      customerName: d.customerName,
+      siteAddress: d.siteAddress,
+      sections: d.sections,
+      overrides: { capacityKw: null, numberOfPanels: null, overrideReason: null },
+      calculations: null,
+      version: 0,
+      dirty: 1,
+      editSeq: 0,
+      syncState: 'local',
+      engineerSigUri: null,
+      engineerSigPending: 0,
+      customerSigUri: null,
+      customerSigPending: 0,
+      photos: [],
+      submitRequested: 0,
+      lastError: null,
+      attempts: 0,
+      nextAttemptAt: null,
+      localUpdatedAt: t,
+      createdAt: t,
+    }
+    store.surveyDrafts[d.localId] = item
+    await persistNow()
+    return { ...item }
+  },
+
+  async saveSections(
+    localId: string,
+    sections: SurveySections,
+    overrides?: SurveyOverrides | null,
+    calculations?: SurveyCalculations | null
+  ) {
+    if (!localId || localId === 'new') return
+    const store = await getStore()
+    const s = store.surveyDrafts[localId]
+    if (!s) return
+    if (s.syncState === 'submitting' || s.syncState === 'submitted') return
+    const custName = sections?.section0?.customerName || sections?.section1?.contactPerson || 'Untitled Survey'
+    const siteAddr = sections?.section0?.siteAddress || ''
+    s.sections = sections
+    if (overrides) s.overrides = overrides
+    if (calculations !== undefined) s.calculations = calculations
+    s.customerName = custName
+    s.siteAddress = siteAddr
+    s.dirty = 1
+    s.editSeq = (s.editSeq || 0) + 1
+    s.localUpdatedAt = now()
+    if (s.syncState === 'synced' || s.syncState === 'failed') {
+      s.syncState = 'local'
+    }
+    await persistNow()
+  },
+
+  async setSignature(localId: string, kind: 'engineer' | 'customer', uri: string): Promise<boolean> {
+    if (!localId || localId === 'new') return false
+    const store = await getStore()
+    const s = store.surveyDrafts[localId]
+    if (!s || s.syncState === 'submitted' || s.syncState === 'submitting') {
+      deleteFile(uri)
+      return false
+    }
+    const old = kind === 'engineer' ? s.engineerSigUri : s.customerSigUri
+    if (old && old !== uri) deleteFile(old)
+
+    if (kind === 'engineer') {
+      s.engineerSigUri = uri
+      s.engineerSigPending = 1
+    } else {
+      s.customerSigUri = uri
+      s.customerSigPending = 1
+    }
+    s.editSeq = (s.editSeq || 0) + 1
+    s.localUpdatedAt = now()
+    if (s.syncState === 'synced' || s.syncState === 'failed') {
+      s.syncState = 'local'
+    }
+    await persistNow()
+    return true
+  },
+
+  async addPhoto(localId: string, photo: SurveyPhotoLocal) {
+    if (!localId || localId === 'new') return
+    const store = await getStore()
+    const s = store.surveyDrafts[localId]
+    if (!s) return
+    s.photos = [...(s.photos || []).filter(p => p.id !== photo.id), photo]
+    s.dirty = 1
+    s.editSeq = (s.editSeq || 0) + 1
+    s.localUpdatedAt = now()
+    await persistNow()
+  },
+
+  async removePhoto(localId: string, photoId: string) {
+    if (!localId || localId === 'new') return
+    const store = await getStore()
+    const s = store.surveyDrafts[localId]
+    if (!s) return
+    const target = (s.photos || []).find(p => p.id === photoId)
+    if (target?.localUri) deleteFile(target.localUri)
+    s.photos = (s.photos || []).filter(p => p.id !== photoId)
+    s.dirty = 1
+    s.editSeq = (s.editSeq || 0) + 1
+    s.localUpdatedAt = now()
+    await persistNow()
+  },
+
+  async patch(localId: string, p: Partial<Omit<SurveyDraft, 'sections' | 'overrides' | 'calculations' | 'photos'>>) {
+    if (!localId || localId === 'new') return
+    const store = await getStore()
+    const s = store.surveyDrafts[localId]
+    if (!s) return
+    Object.assign(s, p)
+    await persistNow()
+  },
+
+  async remove(localId: string) {
+    if (!localId || localId === 'new') return
+    const store = await getStore()
+    const s = store.surveyDrafts[localId]
+    if (s) {
+      deleteFile(s.engineerSigUri)
+      deleteFile(s.customerSigUri)
+      if (s.photos) {
+        for (const p of s.photos) {
+          deleteFile(p.localUri)
+        }
+      }
+      delete store.surveyDrafts[localId]
+      await persistNow()
+    }
+  },
+
+  async countUnsynced(owner: string): Promise<number> {
+    const store = await getStore()
+    return Object.values(store.surveyDrafts).filter(
+      s => s.ownerUserId === owner && !['synced', 'submitted'].includes(s.syncState)
+    ).length
+  },
+}
+
+export const surveysCache = {
+  async put(list: any[]) {
+    const store = await getStore()
+    for (const s of list) {
+      if (s && s.id) {
+        store.surveys[s.id] = s
+      }
+    }
+    await persistNow()
+  },
+
+  async all(): Promise<any[]> {
+    const store = await getStore()
+    return Object.values(store.surveys)
+  },
+
+  async get(id: string): Promise<any | null> {
+    const store = await getStore()
+    return store.surveys[id] ?? null
+  },
 }

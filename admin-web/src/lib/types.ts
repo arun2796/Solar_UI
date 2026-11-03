@@ -1,6 +1,119 @@
 // Mirrors backend/Application/Dtos/Dtos.cs (camelCase JSON)
 export type Paged<T> = { items: T[]; page: number; pageSize: number; total: number }
-export type Me = { userId: string; role: 'admin' | 'engineer'; engineerId?: string | null; engineerName?: string | null; email?: string | null }
+export type Me = { userId: string; role: 'admin' | 'engineer' | 'management'; engineerId?: string | null; engineerName?: string | null; email?: string | null }
+
+export type SurveyStatus = 'assigned' | 'draft' | 'submitted' | 'reviewed' | 'proposal_sent' | 'won' | 'lost'
+export type SurveyVerdict = 'FEASIBLE' | 'CONDITIONAL' | 'NOT_FEASIBLE'
+export type SiteType = 'gated_community' | 'commercial' | 'industrial' | 'maintenance'
+
+export type SurveyListItem = {
+  id: string
+  clientLocalId: string
+  surveyRef?: string | null
+  engineerId: string
+  engineerName: string
+  clientId?: string | null
+  customerName: string
+  siteAddress: string
+  siteType: SiteType
+  status: SurveyStatus
+  verdict?: SurveyVerdict | null
+  recommendedSystemSizeKw?: number | null
+  createdAt: string
+  updatedAt: string
+  submittedAt?: string | null
+  assignedEngineerId?: string | null
+  assignedEngineerName?: string | null
+  plannedVisitDate?: string | null
+  customerType?: 'Commercial' | 'Individual' | string | null
+  companyName?: string | null
+  contactPerson?: string | null
+  contactPhone?: string | null
+  cityArea?: string | null
+  googleMapsUrl?: string | null
+  assignmentNotes?: string | null
+}
+
+export type SurveyPhoto = {
+  id: string
+  surveyId: string
+  sectionNumber: number
+  tag?: string | null
+  filePath: string
+  caption?: string | null
+  gpsLatitude?: number | null
+  gpsLongitude?: number | null
+  takenAt: string
+  createdAt: string
+}
+
+export type SurveyDetail = {
+  id: string
+  clientLocalId: string
+  surveyRef?: string | null
+  engineerId: string
+  engineerName: string
+  clientId?: string | null
+  customerName: string
+  siteAddress: string
+  gpsLatitude?: number | null
+  gpsLongitude?: number | null
+  gpsAccuracy?: number | null
+  siteType: SiteType
+  status: SurveyStatus
+  verdict?: SurveyVerdict | null
+  data: any
+  calculations?: any
+  overrides?: any
+  engineerSignaturePath?: string | null
+  customerSignaturePath?: string | null
+  customerRepName?: string | null
+  pdfPath?: string | null
+  reviewedBy?: string | null
+  reviewedAt?: string | null
+  internalComments?: string | null
+  risks?: string | null
+  version: number
+  createdAt: string
+  updatedAt: string
+  submittedAt?: string | null
+  photos: SurveyPhoto[]
+  assignedEngineerId?: string | null
+  assignedEngineerName?: string | null
+  assignedByUserId?: string | null
+  assignedByUserName?: string | null
+  assignedAt?: string | null
+  customerType?: 'Commercial' | 'Individual' | string | null
+  companyName?: string | null
+  contactPerson?: string | null
+  contactPhone?: string | null
+  cityArea?: string | null
+  googleMapsUrl?: string | null
+  plannedVisitDate?: string | null
+  assignmentNotes?: string | null
+}
+
+export type SurveyTaskCreate = {
+  customerType: 'Commercial' | 'Individual'
+  companyName?: string | null
+  contactPerson: string
+  contactPhone: string
+  siteAddress: string
+  cityArea?: string | null
+  googleMapsUrl?: string | null
+  gpsLatitude?: number | null
+  gpsLongitude?: number | null
+  siteType: SiteType
+  plannedVisitDate?: string | null
+  assignmentNotes?: string | null
+  engineerId: string
+  clientId?: string | null
+}
+
+export type SurveyReassign = {
+  engineerId: string
+  reason?: string | null
+}
 
 export type AmcStatus = 'FREE_YEAR1' | 'AMC' | 'EXPIRED' | 'NONE'
 export const AMC_STATUSES: AmcStatus[] = ['FREE_YEAR1', 'AMC', 'EXPIRED', 'NONE']

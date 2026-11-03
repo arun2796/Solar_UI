@@ -1,6 +1,6 @@
 import { Suspense, useEffect, useState } from 'react'
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { AlertTriangle, BarChart3, CalendarDays, FileText, LayoutDashboard, LogOut, Menu, Settings, ShieldCheck, Users, Wrench, X } from 'lucide-react'
+import { AlertTriangle, BarChart3, CalendarDays, Compass, FileText, LayoutDashboard, LogOut, Menu, Settings, ShieldCheck, Users, Wrench, X } from 'lucide-react'
 import { errorMessage, signOut, statusOf } from '../lib/api'
 import { isDevSession } from '../lib/devAuth'
 import { initAdminIdleTracker } from '../lib/idle'
@@ -39,12 +39,12 @@ export function AdminGuard() {
 
   if (auth === 'out') return <Navigate to={`/login?from=${encodeURIComponent(location.pathname + location.search)}`} replace />
   if (me.isLoading) return <Splash />
-  if (me.isError || me.data?.role !== 'admin') {
+  if (me.isError || (me.data?.role !== 'admin' && me.data?.role !== 'management')) {
     const s = statusOf(me.error)
     const unreachable = me.isError && (s === undefined || s >= 500)
     return <div className="flex min-h-screen flex-col items-center justify-center gap-3 p-6 text-center">
       <ShieldCheck className="h-10 w-10 text-red-600" aria-hidden />
-      <h1 className="text-lg font-semibold">{unreachable ? 'API unreachable' : me.isError ? 'Sign-in not accepted' : 'This account is not an administrator'}</h1>
+      <h1 className="text-lg font-semibold">{unreachable ? 'API unreachable' : me.isError ? 'Sign-in not accepted' : 'This account is not authorized'}</h1>
       <p className="max-w-md text-sm text-slate-600">{me.isError ? errorMessage(me.error) || 'The API rejected this login. The user may not be registered in the Solar system.' : 'Engineer accounts use the mobile app.'}</p>
       <div className="flex gap-2">
         {me.isError && <Button onClick={() => void me.refetch()} loading={me.isFetching}>Retry</Button>}
@@ -56,6 +56,7 @@ export function AdminGuard() {
 
 const nav = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
+  { to: '/surveys', label: 'Site Surveys', icon: Compass },
   { to: '/reports', label: 'Reports', icon: FileText },
   { to: '/clients', label: 'Clients', icon: Users },
   { to: '/engineers', label: 'Engineers', icon: Wrench },

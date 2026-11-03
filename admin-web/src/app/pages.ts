@@ -12,4 +12,6 @@ export const UpcomingOverduePage = lazy(() => import('../features/calendar/Upcom
 export const AmcPage = lazy(() => import('../features/amc/AmcPage'))
 export const DefectSummaryPage = lazy(() => import('../features/defects/DefectSummaryPage'))
 export const SettingsPage = lazy(() => import('../features/settings/SettingsPage'))
+export const SurveysPage = lazy(() => import('../features/surveys/SurveysPage'))
+export const SurveyDetailPage = lazy(() => import('../features/surveys/SurveyDetailPage'))
 
