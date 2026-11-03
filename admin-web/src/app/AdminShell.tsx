@@ -1,12 +1,13 @@
 import { Suspense, useEffect, useState } from 'react'
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { AlertTriangle, BarChart3, CalendarDays, Compass, FileText, LayoutDashboard, LogOut, Menu, Settings, ShieldCheck, Users, Wrench, X } from 'lucide-react'
+import { AlertTriangle, BarChart3, CalendarDays, Compass, FileText, LayoutDashboard, LogOut, Menu, Settings, ShieldCheck, UserCog, Users, Wrench, X } from 'lucide-react'
 import { errorMessage, signOut, statusOf } from '../lib/api'
 import { isDevSession } from '../lib/devAuth'
 import { initAdminIdleTracker } from '../lib/idle'
 import { getSession } from '../lib/session'
 import { useMe } from '../lib/useMe'
 import { cx } from '../lib/format'
+import type { Role } from '../lib/types'
 import { Button, Skeleton } from '../components/ui'
 
 /** 'in' while a session (unexpired refresh token) is stored, else 'out'. Reacts to sign-in/out in this or another tab. */
@@ -54,17 +55,29 @@ export function AdminGuard() {
   return <Shell />
 }
 
-const nav = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/surveys', label: 'Site Surveys', icon: Compass },
-  { to: '/reports', label: 'Reports', icon: FileText },
-  { to: '/clients', label: 'Clients', icon: Users },
-  { to: '/engineers', label: 'Engineers', icon: Wrench },
-  { to: '/calendar', label: 'Calendar', icon: CalendarDays },
-  { to: '/schedule', label: 'Upcoming & Overdue', icon: AlertTriangle },
-  { to: '/amc', label: 'AMC', icon: ShieldCheck },
-  { to: '/defects', label: 'Defect Summary', icon: BarChart3 },
-  { to: '/settings', label: 'Settings', icon: Settings },
+/** First page for a role: management only has Site Surveys. */
+const homeFor = (role?: Role) => (role === 'management' ? '/surveys' : '/')
+
+/** Layout route that refuses pages the signed-in role may not open (management: everything except Site Surveys). */
+export function RequireRole({ roles }: { roles: Role[] }) {
+  const role = useMe().data?.role
+  if (!role || !roles.includes(role)) return <Navigate to={homeFor(role)} replace />
+  return <Outlet />
+}
+
+const ADMIN: Role[] = ['admin']
+const nav: { to: string; label: string; icon: typeof Compass; end?: boolean; roles: Role[] }[] = [
+  { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true, roles: ADMIN },
+  { to: '/surveys', label: 'Site Surveys', icon: Compass, roles: ['admin', 'management'] },
+  { to: '/reports', label: 'Reports', icon: FileText, roles: ADMIN },
+  { to: '/clients', label: 'Clients', icon: Users, roles: ADMIN },
+  { to: '/engineers', label: 'Engineers', icon: Wrench, roles: ADMIN },
+  { to: '/calendar', label: 'Calendar', icon: CalendarDays, roles: ADMIN },
+  { to: '/schedule', label: 'Upcoming & Overdue', icon: AlertTriangle, roles: ADMIN },
+  { to: '/amc', label: 'AMC', icon: ShieldCheck, roles: ADMIN },
+  { to: '/defects', label: 'Defect Summary', icon: BarChart3, roles: ADMIN },
+  { to: '/users', label: 'Users', icon: UserCog, roles: ADMIN },
+  { to: '/settings', label: 'Settings', icon: Settings, roles: ADMIN },
 ]
 
 function Shell() {
@@ -73,7 +86,8 @@ function Shell() {
   const navigate = useNavigate()
   const doSignOut = async () => { await signOut(); navigate('/login') }
   const dev = isDevSession()
-  const links = nav.map(n => <NavLink key={n.to} to={n.to} end={n.end} onClick={() => setOpen(false)}
+  const role = me.data?.role
+  const links = nav.filter(n => role && n.roles.includes(role)).map(n => <NavLink key={n.to} to={n.to} end={n.end} onClick={() => setOpen(false)}
     className={({ isActive }) => cx('flex items-center gap-3 rounded-md px-3 py-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500', isActive ? 'bg-sky-100 font-medium text-sky-900' : 'text-slate-700 hover:bg-slate-100')}><n.icon className="h-4 w-4" aria-hidden />{n.label}</NavLink>)
   const devBadge = dev && <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-800">dev login</span>
   const email = me.data?.email ?? ''
@@ -87,7 +101,7 @@ function Shell() {
         <img src="/company-logo.png" alt="Shree Abhi Electricals & Engineering Pvt. Ltd." className="h-10 w-auto object-contain" />
       </div>
       <nav aria-label="Main" className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">{links}</nav>
-      <div className="border-t border-slate-200 px-5 py-3 text-xs text-slate-400">Solar Maintenance · Admin</div>
+      <div className="border-t border-slate-200 px-5 py-3 text-xs text-slate-400">Solar Maintenance · {role === 'management' ? 'Management' : 'Admin'}</div>
     </aside>
 
     <div className="flex min-w-0 flex-1 flex-col">

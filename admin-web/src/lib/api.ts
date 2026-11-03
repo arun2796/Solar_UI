@@ -3,7 +3,7 @@ import type { DevUser } from './devAuth'
 import { accessToken, API_URL, logout, refresh, setSession, type AuthResponse } from './session'
 import { queryClient } from './queryClient'
 import { SECTIONS } from './types'
-import type { Appointment, AppointmentUpsert, Client, ClientUpsert, Company, DashboardSummary, DefectSummaryItem, Engineer, Me, Paged, Report, ReportFields, ReportListItem, ScheduleItem, ShareLink, SurveyDetail, SurveyListItem, SurveyReassign, SurveyTaskCreate } from './types'
+import type { Appointment, AppointmentUpsert, AppUser, Client, ClientUpsert, Company, DashboardSummary, DefectSummaryItem, Engineer, Me, Paged, Report, ReportFields, ReportListItem, ScheduleItem, ShareLink, SurveyComment, SurveyDetail, SurveyListItem, SurveyReassign, SurveyTaskCreate, UserCreate } from './types'
 
 export { API_URL }
 
@@ -106,6 +106,12 @@ export const api = {
     setActive: (id: string, active: boolean) => http.post<Engineer>(`/engineers/${id}/${active ? 'activate' : 'deactivate'}`).then(r => r.data),
     setPassword: (id: string, password: string) => http.post<Engineer>(`/engineers/${id}/password`, { password }).then(r => r.data),
   },
+  users: {
+    list: () => http.get<AppUser[]>('/users').then(r => r.data),
+    create: (d: UserCreate) => http.post<AppUser>('/users', d).then(r => r.data),
+    setActive: (id: string, active: boolean) => http.post<AppUser>(`/users/${id}/${active ? 'activate' : 'deactivate'}`).then(r => r.data),
+    setPassword: (id: string, newPassword: string) => http.post<AppUser>(`/users/${id}/password`, { newPassword }).then(r => r.data),
+  },
   reports: {
     list: (p: { search?: string; engineerId?: string; clientId?: string; from?: string; to?: string; status?: string; amcStatus?: string; page?: number; pageSize?: number; sort?: string }) =>
       http.get<Paged<ReportListItem>>('/reports', { params: q(p) }).then(r => r.data),
@@ -153,6 +159,11 @@ export const api = {
       http.put<SurveyDetail>(`/surveys/${id}`, d).then(r => r.data),
     updateStatus: (id: string, d: { status: string; internalComments?: string | null }) =>
       http.post<SurveyDetail>(`/surveys/${id}/status`, d).then(r => r.data),
+    approve: (id: string) => http.post<SurveyDetail>(`/surveys/${id}/approve`).then(r => r.data),
+    comments: {
+      list: (id: string) => http.get<SurveyComment[]>(`/surveys/${id}/comments`).then(r => r.data),
+      add: (id: string, body: string) => http.post<SurveyComment>(`/surveys/${id}/comments`, { body }).then(r => r.data),
+    },
     pdfUrl: (id: string, download = false) => `${API_URL}/surveys/${id}/pdf${download ? '?download=true' : ''}`,
     pdfBlob: (id: string) => http.get(`/surveys/${id}/pdf`, { responseType: 'blob', timeout: 90_000 }).then(r => r.data as Blob, unblobError),
     shareLink: (id: string) => http.post<{ url: string; expiresAt: string }>(`/surveys/${id}/share-link`).then(r => r.data),

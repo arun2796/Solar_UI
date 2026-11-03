@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowLeft,
+  BadgeCheck,
   Check,
   CheckCircle,
   Copy,
@@ -20,6 +21,8 @@ import { api, errorMessage } from '../../lib/api'
 import { fmtDateTime, saveBlob } from '../../lib/format'
 import type { SurveyStatus } from '../../lib/types'
 import { Badge, Button, Card, ErrorState, Input, Modal, Notice, Select, Skeleton } from '../../components/ui'
+import { useRole } from '../../lib/useMe'
+import { SurveyComments } from './SurveyComments'
 import { SurveyEditModal } from './SurveyEditModal'
 import { SurveyReassignModal } from './SurveyReassignModal'
 
@@ -27,6 +30,9 @@ export default function SurveyDetailPage() {
   const { id } = useParams<{ id: string }>()
   const nav = useNavigate()
   const qc = useQueryClient()
+  const role = useRole()
+  const isAdmin = role === 'admin'   // management (MD): read-only, plus approve for proposal and comments
+  const canApprove = role === 'admin' || role === 'management'
 
   const [reviewModalOpen, setReviewModalOpen] = useState(false)
   const [reassignModalOpen, setReassignModalOpen] = useState(false)
@@ -60,6 +66,14 @@ export default function SurveyDetailPage() {
     onSuccess: () => {
       setReviewModalOpen(false)
       void qc.invalidateQueries({ queryKey: ['survey', id] })
+      void qc.invalidateQueries({ queryKey: ['surveys'] })
+    },
+  })
+
+  const approveMutation = useMutation({
+    mutationFn: () => api.surveys.approve(id!),
+    onSuccess: data => {
+      qc.setQueryData(['survey', id], data)
       void qc.invalidateQueries({ queryKey: ['surveys'] })
     },
   })
@@ -191,12 +205,19 @@ export default function SurveyDetailPage() {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Button
-            variant="secondary"
-            onClick={() => setReassignModalOpen(true)}
-          >
-            <UserCheck className="mr-1.5 h-4 w-4" /> Reassign
-          </Button>
+          {canApprove && !s.approvedForProposalAt && (s.status === 'submitted' || s.status === 'reviewed') && (
+            <Button loading={approveMutation.isPending} onClick={() => approveMutation.mutate()}>
+              <BadgeCheck className="mr-1.5 h-4 w-4" /> Approve for proposal
+            </Button>
+          )}
+          {isAdmin && (
+            <Button
+              variant="secondary"
+              onClick={() => setReassignModalOpen(true)}
+            >
+              <UserCheck className="mr-1.5 h-4 w-4" /> Reassign
+            </Button>
+          )}
           <Button
             variant="secondary"
             loading={downloadMutation.isPending}
@@ -214,6 +235,7 @@ export default function SurveyDetailPage() {
           >
             <Eye className="mr-1.5 h-4 w-4" /> Preview PDF
           </Button>
+          {isAdmin && <>
           <Button
             variant="secondary"
             onClick={() => setEditModalOpen(true)}
@@ -250,8 +272,22 @@ export default function SurveyDetailPage() {
           >
             <CheckCircle className="mr-1.5 h-4 w-4" /> Review / Change Status
           </Button>
+          </>}
         </div>
       </div>
+
+      {approveMutation.error && <Notice>Approval failed: {errorMessage(approveMutation.error)}</Notice>}
+      {s.approvedForProposalAt && (
+        <div className="flex items-start gap-3 rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-emerald-900 shadow-sm" role="status">
+          <BadgeCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" aria-hidden />
+          <div>
+            <div className="font-bold">Approved for proposal</div>
+            <p className="text-sm">
+              By <span className="font-semibold">{s.approvedForProposalByName || 'management'}</span> on {fmtDateTime(s.approvedForProposalAt)}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Assigned Task Banner */}
       {s.status === 'assigned' && (
@@ -266,9 +302,11 @@ export default function SurveyDetailPage() {
               {s.plannedVisitDate && <> Planned visit date: <span className="font-semibold text-slate-900">{s.plannedVisitDate}</span>.</>}
             </p>
           </div>
-          <Button variant="secondary" onClick={() => setReassignModalOpen(true)} className="shrink-0 bg-white hover:bg-sky-100">
-            <UserCheck className="mr-1.5 h-4 w-4" /> Reassign Engineer
-          </Button>
+          {isAdmin && (
+            <Button variant="secondary" onClick={() => setReassignModalOpen(true)} className="shrink-0 bg-white hover:bg-sky-100">
+              <UserCheck className="mr-1.5 h-4 w-4" /> Reassign Engineer
+            </Button>
+          )}
         </div>
       )}
 
@@ -364,9 +402,11 @@ export default function SurveyDetailPage() {
                 Created and assigned by {s.assignedByUserName || 'Operations'} {s.assignedAt ? `on ${fmtDateTime(s.assignedAt)}` : ''}
               </p>
             </div>
-            <Button variant="secondary" onClick={() => setReassignModalOpen(true)} className="text-xs py-1 px-2.5">
-              <UserCheck className="mr-1.5 h-3.5 w-3.5" /> Reassign
-            </Button>
+            {isAdmin && (
+              <Button variant="secondary" onClick={() => setReassignModalOpen(true)} className="text-xs py-1 px-2.5">
+                <UserCheck className="mr-1.5 h-3.5 w-3.5" /> Reassign
+              </Button>
+            )}
           </div>
           <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-3 text-sm">
             <div>
@@ -735,6 +775,12 @@ export default function SurveyDetailPage() {
                 <span className="text-slate-700">{fmtDateTime(s.reviewedAt)}</span>
               </div>
             )}
+            {s.approvedForProposalAt && (
+              <div className="flex justify-between border-b border-slate-200 py-1.5">
+                <span className="text-slate-500">Approved for proposal</span>
+                <span className="text-slate-700">{s.approvedForProposalByName || '—'} · {fmtDateTime(s.approvedForProposalAt)}</span>
+              </div>
+            )}
             {s.internalComments && (
               <div className="pt-2">
                 <span className="block text-xs font-semibold text-slate-500 uppercase">Internal Comments / Proposal Notes</span>
@@ -745,8 +791,10 @@ export default function SurveyDetailPage() {
         </div>
       </Card>
 
+      {canApprove && <SurveyComments surveyId={s.id} />}
+
       {/* Review & Status Change Modal */}
-      {reviewModalOpen && (
+      {isAdmin && reviewModalOpen && (
         <Modal open={reviewModalOpen} title="Review & Update Survey Status" onClose={() => setReviewModalOpen(false)}>
           <div className="space-y-4">
             <div>
@@ -876,7 +924,7 @@ export default function SurveyDetailPage() {
       )}
 
       {/* Reassign Modal */}
-      {reassignModalOpen && (
+      {isAdmin && reassignModalOpen && (
         <SurveyReassignModal
           open={reassignModalOpen}
           onClose={() => setReassignModalOpen(false)}
@@ -889,7 +937,7 @@ export default function SurveyDetailPage() {
       )}
 
       {/* Edit Survey Modal */}
-      {editModalOpen && (
+      {isAdmin && editModalOpen && (
         <SurveyEditModal
           open={editModalOpen}
           onClose={() => setEditModalOpen(false)}
