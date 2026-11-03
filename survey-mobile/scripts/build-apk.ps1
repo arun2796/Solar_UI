@@ -1,4 +1,4 @@
-# Builds an Android APK locally (Windows, no Docker, no EAS account needed).
+# Builds the Site Survey app as an Android APK locally (Windows, no Docker, no EAS account needed).
 #
 #   Test build (developer sign-in on, talks to your PC over Wi-Fi, server address editable in the app):
 #     powershell -File scripts\build-apk.ps1 -Profile test
@@ -57,6 +57,11 @@ $env:EXPO_PUBLIC_API_URL = $ApiUrl
 $env:NODE_ENV = "production"
 Write-Host "Profile: $Profile   API: $ApiUrl   Dev sign-in: $($env:EXPO_PUBLIC_DEV_LOGIN)"
 
+# The bundler caches compiled code without the EXPO_PUBLIC_* values, so a build could keep another profile's API address
+# or developer sign-in. Always start from an empty cache.
+Remove-Item -Recurse -Force (Join-Path $env:TEMP "metro-cache"), (Join-Path $root "node_modules\.cache"), (Join-Path $root "android\app\build\generated\assets") -ErrorAction SilentlyContinue
+Get-ChildItem $env:TEMP -Directory -Filter "metro-*" -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+
 npx expo prebuild --platform android --no-install
 if ($LASTEXITCODE -ne 0) { throw "expo prebuild failed" }
 
@@ -85,11 +90,12 @@ if ($Profile -eq "production") {
   foreach ($bad in @("192.168.", "10.0.2.2", "localhost:5000", "127.0.0.1")) {
     if ($text.Contains($bad)) { throw "Verification failed: the production bundle contains a development address ($bad)" }
   }
+  if ($text.Contains("Quick sign-in")) { throw "Verification failed: the production bundle contains the developer quick sign-in" }
 }
 Write-Host "Verified: bundle uses $ApiUrl"
 
 # ---- sign with the release key (optional)
-$out = Join-Path (Split-Path -Parent (Split-Path -Parent $root)) "solar-maintenance-$Profile.apk"
+$out = Join-Path (Split-Path -Parent (Split-Path -Parent $root)) "solar-survey-$Profile.apk"
 if ($Keystore) {
   $sdk = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } else { Join-Path $env:LOCALAPPDATA "Android\Sdk" }
   $bt = Get-ChildItem (Join-Path $sdk "build-tools") -Directory | Sort-Object { [version]($_.Name -replace "[^\d.]", "") } | Select-Object -Last 1
@@ -97,7 +103,7 @@ if ($Keystore) {
   $pw = Read-Host "Password for keystore $Keystore" -AsSecureString
   $env:SOLAR_KS_PASS = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($pw))
   try {
-    & $apksigner sign --ks $Keystore --ks-key-alias $KeyAlias --ks-pass env:SOLAR_KS_PASS --out $out $apk
+    & $apksigner sign --v4-signing-enabled false --ks $Keystore --ks-key-alias $KeyAlias --ks-pass env:SOLAR_KS_PASS --out $out $apk
     if ($LASTEXITCODE -ne 0) { throw "apksigner failed" }
     & $apksigner verify $out
     if ($LASTEXITCODE -ne 0) { throw "apksigner verify failed" }
