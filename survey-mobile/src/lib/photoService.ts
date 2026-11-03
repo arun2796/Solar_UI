@@ -10,11 +10,14 @@ export async function getCurrentGps(): Promise<{ lat: number; lng: number } | nu
     const { status } = await Location.requestForegroundPermissionsAsync()
     if (status !== 'granted') return null
 
-    const loc = await Promise.race([
+    // A recent last-known position is instant; only without one wait (briefly) for a fresh fix, so a weak GPS
+    // signal on a rooftop never holds up attaching a photo.
+    const recent = await Location.getLastKnownPositionAsync({ maxAge: 10 * 60_000, requiredAccuracy: 200 }).catch(() => null)
+    const loc = recent ?? await Promise.race([
       Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       }),
-      new Promise<null>(resolve => setTimeout(() => resolve(null), 8000)),
+      new Promise<null>(resolve => setTimeout(() => resolve(null), 5000)),
     ])
 
     if (loc && 'coords' in loc) {

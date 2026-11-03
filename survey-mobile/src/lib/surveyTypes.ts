@@ -292,7 +292,7 @@ export function defaultSurveySections(engineerName = ''): SurveySections {
       roofLengthFt: null,
       roofWidthFt: null,
       obstructionAreas: [],
-      waterproofingStatus: 'Good',
+      waterproofingStatus: '',                 // the engineer must choose (required)
       materialAccess: 'Stairs',
     },
     section4: {
@@ -300,30 +300,31 @@ export function defaultSurveySections(engineerName = ''): SurveySections {
       shadowSources: '',
       timeOfObservation: '12:00 PM',
       shadowAreaPercent: 0,
-      sunExposure8to10: true,
-      sunExposure10to2: true,
-      sunExposure2to5: true,
+      sunExposure8to10: false,                 // sunny hours are entered per window (sunHours8to10…)
+      sunExposure10to2: false,
+      sunExposure2to5: false,
     },
     section5: {
-      mdbLocation: 'Ground floor electrical room',
+      // Site observations start empty: example values here could be submitted without the engineer checking the site.
+      mdbLocation: '',
       roofToInverterDistanceM: null,
-      inverterSpace: 'Adequate wall space available',
+      inverterSpace: '',
       earthingPoints: null,
       wifiAvailable: true,
-      ebMeterLocation: 'Main gate / electrical panel room',
-      acdbLocation: 'Adjacent to main inverter',
+      ebMeterLocation: '',
+      acdbLocation: '',
       cableRoutes: [
-        { label: 'DC Cable (Panels to Inverter)', lengthM: 20 },
-        { label: 'AC Cable (Inverter to MDB)', lengthM: 30 },
+        { label: 'DC Cable (Panels to Inverter)', lengthM: 0 },
+        { label: 'AC Cable (Inverter to MDB)', lengthM: 0 },
       ],
-      earthPitLocation: 'Behind building / near electrical room',
+      earthPitLocation: '',
     },
     section6: {
       recommendedCapacityKw: null,
-      mountingStructure: 'Elevated HDGI structure with 10 deg south tilt',
+      mountingStructure: '',
       cableRouteFeasible: true,
       structuralReinforcement: false,
-      safetyConstraints: 'Lifeline and perimeter safety harness required during installation',
+      safetyConstraints: '',
     },
     section7: {
       checklist: {
