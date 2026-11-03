@@ -60,6 +60,8 @@ export const api = {
   },
   client: (id: string) => http.get<Client>(`/clients/${id}`).then(r => r.data),
   dashboard: () => http.get<EngineerDashboard>('/dashboard/engineer').then(r => r.data),
+  /** May this engineer start the client today? canStart is false when the visit is assigned to someone else. */
+  assignmentCheck: (clientId: string) => http.get<{ canStart: boolean; assignedTo?: string | null; scheduledDate?: string | null; message?: string | null }>('/appointments/check', { params: { clientId } }).then(r => r.data),
   reports: {
     /** Final reports (submitted, or corrected by an admin), newest first. */
     history: async (): Promise<ReportListItem[]> => {

@@ -47,7 +47,7 @@ jobs:
           if [ -n "$KS_B64" ]; then
             echo "$KS_B64" | base64 -d > /tmp/release.jks
             BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
-            "$BT/apksigner" sign --ks /tmp/release.jks --ks-key-alias "$KS_ALIAS" --ks-pass env:KS_PASS --out solar-maintenance.apk "$APK"
+            "$BT/apksigner" sign --v4-signing-enabled false --ks /tmp/release.jks --ks-key-alias "$KS_ALIAS" --ks-pass env:KS_PASS --out solar-maintenance.apk "$APK"
             rm /tmp/release.jks
           else
             echo "::warning::No release keystore secrets: APK is signed with the debug key"

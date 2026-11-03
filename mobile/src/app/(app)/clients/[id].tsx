@@ -11,10 +11,15 @@ import { colors, font } from '../../../theme'
 export default function ClientDetails() {
   const { id } = useLocalSearchParams<{ id: string }>(); const router = useRouter()
   const [c, setC] = useState<Client | null>(null)
-  useEffect(() => { clientsCache.get(id).then(x => x && setC(x)); api.client(id).then(x => { setC(x); void clientsCache.put([x]) }).catch(() => {}) }, [id])
+  const [blocked, setBlocked] = useState<string | null>(null)   // set when today's visit is assigned to another engineer
+  useEffect(() => {
+    clientsCache.get(id).then(x => x && setC(x)); api.client(id).then(x => { setC(x); void clientsCache.put([x]) }).catch(() => {})
+    // Offline the check is skipped: the server refuses the draft on sync and Drafts shows the same message.
+    api.assignmentCheck(id).then(r => setBlocked(r.canStart ? null : r.message ?? 'This visit is assigned to another engineer.')).catch(() => {})
+  }, [id])
 
   const start = async () => {
-    if (!c) return
+    if (!c || blocked) return
     const owner = currentUserId(); if (!owner) return
     const existing = (await drafts.all(owner)).find(d => d.clientId === c.id && !['submitted', 'elsewhere'].includes(d.syncState))
     if (existing) { Alert.alert('Draft exists', `A draft for ${c.name} (visit ${fmtDate(existing.fields.visitDate)}) is already open.`, [{ text: 'Open draft', onPress: () => router.push(`/(app)/reports/${existing.localId}/review`) }, { text: 'Start new', onPress: () => void create() }, { text: 'Cancel', style: 'cancel' }]); return }
@@ -28,8 +33,9 @@ export default function ClientDetails() {
     router.replace(`/(app)/reports/${d.localId}/section/1`)
   }
   if (!c) return <Screen><Loading /></Screen>
-  return <Screen footer={<Button title="Start maintenance" onPress={start} />}>
+  return <Screen footer={<Button title={blocked ? 'Assigned to another engineer' : 'Start maintenance'} onPress={start} disabled={!!blocked} />}>
     <Title sub={c.siteLocation ?? c.address ?? undefined}>{c.name}</Title>
+    {blocked && <Card style={{ borderColor: colors.warn, backgroundColor: colors.warnSoft }}><Text accessibilityRole="alert" style={{ color: colors.warn, fontWeight: '700', fontSize: font.base }}>{blocked}</Text></Card>}
     <Card><Text style={s.h}>Contact</Text><Row k="Contact person" v={c.contactPerson} /><Row k="Phone" v={c.phone} /><Row k="Address" v={c.address} /></Card>
     <Card><Text style={s.h}>Installation</Text><Row k="Solar capacity" v={c.solarCapacityKwp ? `${c.solarCapacityKwp} kWp` : undefined} />
       <Row k="Modules" v={[c.moduleMake, c.moduleModel].filter(Boolean).join(' ') || undefined} /><Row k="Module count / W" v={c.moduleCount ? `${c.moduleCount} × ${c.moduleWattage ?? '?'} W` : undefined} />

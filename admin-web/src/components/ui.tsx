@@ -1,5 +1,5 @@
 import { type ReactNode, useEffect, useId, useRef } from 'react'
-import { AlertCircle, CheckCircle2, Inbox, Loader2, X } from 'lucide-react'
+import { AlertCircle, CheckCircle2, Inbox, Loader2, X, type LucideIcon } from 'lucide-react'
 import { cx, inputCls } from '../lib/format'
 
 export function Button({ variant = 'primary', className, loading, children, type = 'button', ...p }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'danger' | 'ghost'; loading?: boolean }) {
@@ -32,9 +32,12 @@ export function PageHeader({ title, subtitle, actions }: { title: string; subtit
 
 export function Card({ children, className }: { children: ReactNode; className?: string }) { return <div className={cx('rounded-lg border border-slate-200 bg-white p-4 shadow-sm', className)}>{children}</div> }
 
-export function StatCard({ label, value, tone = 'default', onClick }: { label: string; value: number | string; tone?: 'default' | 'warn' | 'danger' | 'ok'; onClick?: () => void }) {
-  const t = { default: 'text-slate-900', warn: 'text-amber-700', danger: 'text-red-600', ok: 'text-emerald-700' }[tone]
-  return <button type="button" onClick={onClick} className="rounded-lg border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-sky-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"><div className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</div><div className={cx('mt-1 text-3xl font-semibold', t)}>{value}</div></button>
+export function StatCard({ label, value, tone = 'default', onClick, icon: Icon, hint }: { label: string; value: number | string; tone?: 'default' | 'warn' | 'danger' | 'ok'; onClick?: () => void; icon?: LucideIcon; hint?: string }) {
+  const t = { default: ['text-slate-900', 'bg-sky-50 text-sky-700'], warn: ['text-amber-700', 'bg-amber-50 text-amber-700'], danger: ['text-red-600', 'bg-red-50 text-red-600'], ok: ['text-emerald-700', 'bg-emerald-50 text-emerald-700'] }[tone]
+  return <button type="button" onClick={onClick} className="group flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400">
+    <div className="min-w-0"><div className="text-sm font-medium text-slate-500">{label}</div><div className={cx('mt-1 text-3xl font-bold tabular-nums', t[0])}>{value}</div>
+      {hint && <div className="mt-1 text-xs text-slate-400 group-hover:text-sky-700">{hint}</div>}</div>
+    {Icon && <span className={cx('rounded-lg p-2', t[1])}><Icon className="h-5 w-5" aria-hidden /></span>}</button>
 }
 
 export function Badge({ children, tone = 'slate' }: { children: ReactNode; tone?: 'slate' | 'green' | 'red' | 'amber' | 'blue' }) {

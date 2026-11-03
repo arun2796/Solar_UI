@@ -168,9 +168,9 @@ test('expired access token is refreshed silently; a revoked session returns to l
   await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible({ timeout: 20_000 })
   // pretend the access token expired: the next API call must go through /auth/refresh first
   await page.evaluate(() => {
-    const s = JSON.parse(localStorage.getItem('solar_session')!)
+    const s = JSON.parse(sessionStorage.getItem('solar_session')!)
     s.accessTokenExpiresAt = new Date(Date.now() - 60_000).toISOString()
-    localStorage.setItem('solar_session', JSON.stringify(s))
+    sessionStorage.setItem('solar_session', JSON.stringify(s))
   })
   const refreshed = page.waitForResponse(r => r.url().endsWith('/auth/refresh') && r.status() === 200)
   await page.getByRole('link', { name: 'Reports' }).click()
@@ -178,12 +178,12 @@ test('expired access token is refreshed silently; a revoked session returns to l
   await expect(page.getByRole('heading', { name: 'Maintenance reports' })).toBeVisible()
   await expect(page.locator('tbody tr').first()).toBeVisible({ timeout: 15_000 })
   // revoke the stored refresh token at the API (as an admin password reset or sign-out elsewhere would)
-  const refreshToken = await page.evaluate(() => JSON.parse(localStorage.getItem('solar_session')!).refreshToken as string)
+  const refreshToken = await page.evaluate(() => JSON.parse(sessionStorage.getItem('solar_session')!).refreshToken as string)
   expect((await page.request.post(`${API}/auth/logout`, { data: { refreshToken } })).status()).toBe(204)
   await page.evaluate(() => {
-    const s = JSON.parse(localStorage.getItem('solar_session')!)
+    const s = JSON.parse(sessionStorage.getItem('solar_session')!)
     s.accessTokenExpiresAt = new Date(Date.now() - 60_000).toISOString()
-    localStorage.setItem('solar_session', JSON.stringify(s))
+    sessionStorage.setItem('solar_session', JSON.stringify(s))
   })
   await page.getByRole('link', { name: 'Clients' }).click()
   await expect(page).toHaveURL(/\/login/, { timeout: 15_000 })
