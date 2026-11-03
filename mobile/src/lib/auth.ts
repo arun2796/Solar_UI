@@ -1,5 +1,5 @@
 import axios, { isAxiosError } from 'axios'
-import AsyncStorage from '@react-native-async-storage/async-storage'
+import AsyncStorage from 'expo-sqlite/kv-store'
 import * as SecureStore from 'expo-secure-store'
 import { config } from './config'
 import { createStore } from './store'
