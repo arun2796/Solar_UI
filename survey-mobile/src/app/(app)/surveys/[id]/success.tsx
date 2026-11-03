@@ -5,6 +5,7 @@ import * as Sharing from 'expo-sharing'
 import { surveyDrafts } from '../../../../db'
 import type { SurveyDraft } from '../../../../lib/surveyTypes'
 import { api } from '../../../../lib/api'
+import { syncStore } from '../../../../lib/store'
 import { Button, Card, Loading, NotFound, Screen } from '../../../../components/ui'
 import { colors, font, space } from '../../../../theme'
 
@@ -17,9 +18,11 @@ export default function SurveySuccess() {
   const [emailing, setEmailing] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
 
+  // Reload after every sync: a survey submitted offline gets its SV number when it reaches the server.
+  const tick = syncStore.use(s => s.tick)
   useEffect(() => {
     void surveyDrafts.get(id).then(setDraft)
-  }, [id])
+  }, [id, tick])
 
   const finish = () => {
     router.dismissAll()
@@ -46,7 +49,8 @@ export default function SurveySuccess() {
     return <NotFound text="Survey record not found." onBack={finish} />
   }
 
-  const surveyNum = draft.surveyNumber || 'SV-XXXX'
+  const sent = draft.syncState === 'submitted'
+  const surveyNum = draft.surveyNumber || 'No number yet'
   const customerName = draft.customerName || draft.sections?.section0?.customerName || 'Customer'
   const recommendedKw = draft.calculations?.recommendedSystemSizeKw ?? draft.sections?.section9?.systemSizeKw ?? 0
   const annualSavings = draft.calculations?.annualSavingsRs ?? draft.sections?.section9?.annualSavingsRs ?? 0
@@ -125,21 +129,29 @@ export default function SurveySuccess() {
     <Screen
       footer={
         <View style={{ gap: space.sm }}>
+          {!sent && (
+            <Text style={{ color: colors.muted, fontSize: font.small, textAlign: 'center' }}>
+              The PDF, WhatsApp and email options work once the survey has reached the server.
+            </Text>
+          )}
           <Button
             title="📄  Share PDF (WhatsApp, Email…)"
             loading={sharing}
+            disabled={!sent}
             onPress={handleSharePdf}
           />
           <Button
             title="💬  Send WhatsApp Summary & Link"
             variant="secondary"
             loading={sharingWhatsApp}
+            disabled={!sent}
             onPress={handleSendWhatsApp}
           />
           <Button
             title="✉️  Email PDF Report to Customer"
             variant="secondary"
             loading={emailing}
+            disabled={!sent}
             onPress={handleSendEmail}
           />
           <Button title="Done" variant="secondary" onPress={finish} />
@@ -257,7 +269,9 @@ export default function SurveySuccess() {
             textAlign: 'center',
           }}
         >
-          This survey is locked for editing. The Operations and Management teams have received the report for proposal review.
+          {sent
+            ? 'This survey is locked for editing. The Operations and Management teams have received the report for proposal review.'
+            : 'This survey is locked for editing and saved on this phone. It is sent automatically as soon as there is a connection; the survey number appears here then.'}
         </Text>
       </View>
     </Screen>
