@@ -61,13 +61,19 @@ export function settingsFromApi(raw: Record<string, string> | null | undefined):
   return out
 }
 
-/** ₹ per unit for the chosen tariff category (admin setting), LT-2 when none is chosen. */
-export function tariffRate(category: TariffCategory | null | undefined, settings: CalculationSettings = DEFAULT_SETTINGS): number {
+/** ₹ per unit: the rate from the bill when entered, else the category's rate (admin setting), else LT-2. */
+export function tariffRate(category: TariffCategory | null | undefined, settings: CalculationSettings = DEFAULT_SETTINGS, rateFromBill?: number | null): number {
+  if (rateFromBill != null && rateFromBill > 0) return rateFromBill
   return (category && settings.tariffs?.[category]) || settings.tariffs?.['LT-2'] || 7.0
 }
 
-/** Sunny (shadow-free) hours from the three time bands, or null when the engineer has not marked any band. */
+/**
+ * Shadow-free sun hours: the hours entered per band (8–10, 10–2, 2–5) when any is entered, else the older yes/no bands
+ * (2, 4 and 3 hours). Null when nothing is entered, so an untouched section does not raise the shadow flag.
+ */
 export function shadowFreeSunHours(sec4?: SurveySection4 | null): number | null {
+  const bands = [sec4?.sunHours8to10, sec4?.sunHours10to2, sec4?.sunHours2to5]
+  if (bands.some(h => h != null)) return round2(bands.reduce<number>((sum, h) => sum + Math.max(0, h ?? 0), 0))
   if (!sec4?.sunExposure8to10 && !sec4?.sunExposure10to2 && !sec4?.sunExposure2to5) return null
   return (sec4.sunExposure8to10 ? 2 : 0) + (sec4.sunExposure10to2 ? 4 : 0) + (sec4.sunExposure2to5 ? 3 : 0)
 }
@@ -82,7 +88,7 @@ export function calculateSurvey(
 ): SurveyCalculations {
   const c: CalculationSettings = { ...DEFAULT_SETTINGS, tariffs: { ...DEFAULT_SETTINGS.tariffs, ...settings?.tariffs } }
   for (const k of Object.keys(API_KEYS) as NumericSetting[]) if (settings?.[k] > 0) c[k] = settings[k]   // invalid values keep the default
-  const tariff = tariffRate(sec2?.tariffCategory, c)
+  const tariff = tariffRate(sec2?.tariffCategory, c, sec2?.tariffRateRs)
 
   // 1. Consumption: 24-month units ÷ 730, then ÷ generation per kW per day
   const units24 = Math.max(0, sec2?.history24MonthsUnits ?? 0)

@@ -29,12 +29,15 @@ export function sectionsToBackendData(sections: SurveySections) {
   const s8 = sections?.section8
   const s9 = sections?.section9
 
-  const tariff = tariffRate(s2?.tariffCategory, currentSurveySettings())   // the admin's rate for the category
+  const tariff = tariffRate(s2?.tariffCategory, currentSurveySettings(), s2?.tariffRateRs)   // the bill's rate, else the admin's rate for the category
 
   const sunHours = shadowFreeSunHours(s4)           // null = not entered (no shadow flag from it)
-  const sun8to10 = sunHours == null ? null : s4?.sunExposure8to10 ? 2 : 0
-  const sun10to2 = sunHours == null ? null : s4?.sunExposure10to2 ? 4 : 0
-  const sun2to5 = sunHours == null ? null : s4?.sunExposure2to5 ? 3 : 0
+  const entered = [s4?.sunHours8to10, s4?.sunHours10to2, s4?.sunHours2to5].some(h => h != null)
+  const band = (hours: number | null | undefined, yes: boolean | undefined, full: number) =>
+    sunHours == null ? null : entered ? Math.max(0, hours ?? 0) : yes ? full : 0
+  const sun8to10 = band(s4?.sunHours8to10, s4?.sunExposure8to10, 2)
+  const sun10to2 = band(s4?.sunHours10to2, s4?.sunExposure10to2, 4)
+  const sun2to5 = band(s4?.sunHours2to5, s4?.sunExposure2to5, 3)
 
   return {
     section0: {
@@ -77,9 +80,9 @@ export function sectionsToBackendData(sections: SurveySections) {
       tiltAngleDeg: s3?.tiltAngleDeg ?? null,
       lengthFt: s3?.roofLengthFt ?? null,
       widthFt: s3?.roofWidthFt ?? null,
-      obstructionsDescription: s3?.hasObstructions ? 'Obstructions recorded' : 'None',
+      obstructionsDescription: s3?.hasObstructions ? s3?.obstructionsDescription?.trim() || 'Obstructions recorded' : 'None',
       obstructionAreasSqft: s3?.obstructionAreas?.map(o => o.areaSqft).filter(a => a > 0) ?? [],
-      waterproofingStatus: s3?.waterproofingStatus ?? 'Good',
+      waterproofingStatus: s3?.waterproofingStatus || null,
       materialAccess: s3?.materialAccess?.toLowerCase() ?? 'stairs',
     },
     section4: {
@@ -120,7 +123,7 @@ export function sectionsToBackendData(sections: SurveySections) {
       generalObservations: s8?.observations ?? null,
       specialRequirements: s8?.specialRequirements ?? null,
       risks: s8?.risks ?? null,
-      customerRepName: s1?.contactPerson ?? null,
+      customerRepName: s8?.customerRepName?.trim() || s1?.contactPerson || null,
     },
     section9: {
       verdict: s9?.verdict || null,                 // never invent a verdict: Submit requires the engineer's choice

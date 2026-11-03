@@ -28,7 +28,7 @@ import { surveyDrafts } from '../../../../db'
 import { useSurveyDraft } from '../../../../forms/useSurveyDraft'
 import { captureOrPickPhoto, getCurrentGps } from '../../../../lib/photoService'
 import { tariffRate } from '../../../../lib/surveyCalculator'
-import { currentSurveySettings } from '../../../../lib/surveySettings'
+import { currentSurveySettings, mandatoryPhotos, PHOTO_LABELS } from '../../../../lib/surveySettings'
 import type {
   CableRouteItem,
   CustomerType,
@@ -150,16 +150,23 @@ export default function SurveyFormScreen() {
   const s8 = sections.section8
   const s9 = sections.section9
 
-  // Section completion checks
-  const isS0Done = !!(s0.customerName && s0.siteAddress)
-  const isS1Done = !!(s1.contactPerson && /^[6-9]\d{9}$/.test(s1.contactPhone || ''))
-  const isS2Done = !!(s2.tariffCategory && (s2.monthlyBillRs || s2.history24MonthsUnits))
-  const isS3Done = !!(s3.installationType && (s3.availableAreaSqft || (s3.roofLengthFt && s3.roofWidthFt)))
-  const isS4Done = s4.shadowObserved !== undefined
-  const isS5Done = !!s5.mdbLocation
-  const isS6Done = s6.cableRouteFeasible !== undefined
-  const isS7Done = photos.length > 0
-  const isS8Done = !!(draft.engineerSigUri && draft.customerSigUri)
+  // Section completion checks: a section is Done only when its required fields are filled (brief, Rules).
+  const required = mandatoryPhotos(s0.siteType)
+  const hasPhoto = (tag: string) => photos.some((p: { section: string }) => p.section === tag)
+  const missingPhotos = required.filter(t => !hasPhoto(t))
+  const sunEntered = [s4.sunHours8to10, s4.sunHours10to2, s4.sunHours2to5].some(h => h != null)
+  const isS0Done = !!(s0.customerName && s0.siteAddress && s0.siteType)
+  const isS1Done = !!(s1.contactPerson && /^[6-9]\d{9}$/.test(s1.contactPhone || '') && s1.customerType)
+  const isS2Done = !!(s2.tariffCategory && (s2.history24MonthsUnits ?? 0) > 0 && s2.ebServiceNumbers?.some(Boolean)
+    && (!required.includes('eb_bill') || hasPhoto('eb_bill')))
+  const isS3Done = !!(s3.installationType && (s3.availableAreaSqft || (s3.roofLengthFt && s3.roofWidthFt)) && s3.roofCondition
+    && s3.waterproofingStatus && (!required.includes('roof') || hasPhoto('roof')))
+  const isS4Done = s4.shadowObserved !== undefined && sunEntered && (!s4.shadowObserved || s4.shadowAreaPercent != null)
+  const isS5Done = !!(s5.mdbLocation && s5.ebMeterLocation && s5.cableRoutes?.some(r => r.lengthM > 0)
+    && (!required.includes('panel_mdb') || hasPhoto('panel_mdb')) && (!required.includes('eb_meter') || hasPhoto('eb_meter')))
+  const isS6Done = !!(s6.mountingStructure && s6.cableRouteFeasible !== undefined)
+  const isS7Done = missingPhotos.length === 0
+  const isS8Done = !!(draft.engineerSigUri && draft.customerSigUri && (s8.customerRepName?.trim() || s1.contactPerson))
   const isS9Done = !!s9.verdict
 
   const doneSteps = [
@@ -232,6 +239,12 @@ export default function SurveyFormScreen() {
     }
     if (!draft.customerSigUri) {
       issues.push({ section: 9, text: 'Customer signature is required (Section 9).' })
+    }
+    if (missingPhotos.length > 0) {
+      issues.push({ section: 8, text: `Mandatory photos missing: ${missingPhotos.map(t => PHOTO_LABELS[t]).join(', ')} (Section 8).` })
+    }
+    if (!(s8.customerRepName?.trim() || s1.contactPerson)) {
+      issues.push({ section: 9, text: 'Name of the customer representative who signs is required (Section 9).' })
     }
     if (!s9.verdict) {
       issues.push({ section: 10, text: 'Survey verdict (Feasible / Conditional / Not Feasible) is MANDATORY (Section 10).' })
@@ -625,12 +638,30 @@ export default function SurveyFormScreen() {
             />
           </Field>
 
-          <Field label="24-Month Total Units (kWh)">
+          <Field label="24-Month Total Units (kWh) *">
             <NumberInput
               value={s2.history24MonthsUnits}
               editable={!locked}
-              placeholder="Optional: past 24-month kWh"
+              placeholder="Sum of the last 24 bills, used for sizing"
               onChange={(v: number | null) => setSection('section2', { history24MonthsUnits: v })}
+            />
+          </Field>
+
+          <Field label="24-Month Amount Paid (₹)">
+            <NumberInput
+              value={s2.history24MonthsAmount}
+              editable={!locked}
+              placeholder="Sum of the last 24 bills"
+              onChange={(v: number | null) => setSection('section2', { history24MonthsAmount: v })}
+            />
+          </Field>
+
+          <Field label="Tariff Rate from the Bill (₹ per unit)">
+            <NumberInput
+              value={s2.tariffRateRs ?? null}
+              editable={!locked}
+              placeholder={`Empty = ${s2.tariffCategory} rate (₹${tariffRate(s2.tariffCategory, currentSurveySettings())})`}
+              onChange={(v: number | null) => setSection('section2', { tariffRateRs: v })}
             />
           </Field>
 
@@ -815,6 +846,32 @@ export default function SurveyFormScreen() {
             )}
           </Field>
 
+          {s3.hasObstructions && (
+            <Field label="What are the obstructions?">
+              <Input
+                value={s3.obstructionsDescription ?? ''}
+                editable={!locked}
+                placeholder="e.g. Water tank, lift room, solar heater"
+                onChangeText={(t: string) => setSection('section3', { obstructionsDescription: t })}
+              />
+            </Field>
+          )}
+
+          <Field label="Waterproofing Status *">
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.xs }}>
+              {['Good', 'Needs repair', 'Not done'].map(w => (
+                <Pressable
+                  key={w}
+                  disabled={locked}
+                  onPress={() => setSection('section3', { waterproofingStatus: w })}
+                  style={[styles.tagBtn, s3.waterproofingStatus === w && styles.tagBtnActive]}
+                >
+                  <Text style={[styles.tagText, s3.waterproofingStatus === w && styles.tagTextActive]}>{w}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </Field>
+
           <Field label="Material Access">
             <View style={{ flexDirection: 'row', gap: space.xs }}>
               {(['Stairs', 'Lift', 'Crane'] as MaterialAccess[]).map(ma => (
@@ -882,33 +939,29 @@ export default function SurveyFormScreen() {
               onChange={(v: number | null) => setSection('section4', { shadowAreaPercent: v })}
             />
           </Field>
-          <Field label="Direct Sun Exposure Windows">
+          <Field label="Sunny (shadow-free) hours in each window *">
             <View style={{ gap: space.xs }}>
-              {[
-                ['sunExposure8to10', '8:00 AM – 10:00 AM (2 hours)', s4.sunExposure8to10],
-                ['sunExposure10to2', '10:00 AM – 2:00 PM (4 peak hours)', s4.sunExposure10to2],
-                ['sunExposure2to5', '2:00 PM – 5:00 PM (3 hours)', s4.sunExposure2to5],
-              ].map(([key, label, val]) => (
-                <Pressable
-                  key={key as string}
-                  disabled={locked}
-                  onPress={() => setSection('section4', { [key as string]: !val })}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    padding: space.sm,
-                    backgroundColor: val ? colors.goodSoft : colors.surface,
-                    borderRadius: 8,
-                    borderWidth: 1,
-                    borderColor: val ? colors.good : colors.border,
-                  }}
-                >
-                  <Text style={{ fontSize: 16, marginRight: space.sm }}>{val ? '✓' : '○'}</Text>
-                  <Text style={{ fontWeight: '700', color: val ? colors.good : colors.text }}>
-                    {label as string}
-                  </Text>
-                </Pressable>
+              {([
+                ['sunHours8to10', '8:00 – 10:00 AM (0–2 h)', s4.sunHours8to10, 2],
+                ['sunHours10to2', '10:00 AM – 2:00 PM (0–4 h)', s4.sunHours10to2, 4],
+                ['sunHours2to5', '2:00 – 5:00 PM (0–3 h)', s4.sunHours2to5, 3],
+              ] as const).map(([key, label, val, max]) => (
+                <View key={key} style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+                  <Text style={{ flex: 1, fontWeight: '600' }}>{label}</Text>
+                  <View style={{ width: 110 }}>
+                    <NumberInput
+                      value={val ?? null}
+                      editable={!locked}
+                      max={max}
+                      placeholder="hours"
+                      onChange={(v: number | null) => setSection('section4', { [key]: v })}
+                    />
+                  </View>
+                </View>
               ))}
+              <Text style={{ fontSize: font.small, color: colors.muted }}>
+                Fewer than 6 sunny hours in total, or more than 30% shadow, suggests a Conditional verdict.
+              </Text>
             </View>
           </Field>
 
@@ -987,6 +1040,15 @@ export default function SurveyFormScreen() {
             />
           </Field>
 
+          <Field label="Earth Pit Location">
+            <Input
+              value={s5.earthPitLocation ?? ''}
+              editable={!locked}
+              placeholder="e.g. Near DG yard, east side"
+              onChangeText={(t: string) => setSection('section5', { earthPitLocation: t })}
+            />
+          </Field>
+
           {/* Dynamic Cable Routes */}
           <Field label="Cable Routes & Estimated Lengths (m)">
             {s5.cableRoutes.map((cr: CableRouteItem, i: number) => (
@@ -1042,12 +1104,22 @@ export default function SurveyFormScreen() {
 
           {/* Panel Photos */}
           <View style={{ marginTop: space.sm }}>
-            <Text style={{ fontWeight: '700', marginBottom: space.xs }}>Electrical Panel / Meter Photos</Text>
+            <Text style={{ fontWeight: '700', marginBottom: space.xs }}>Main Panel / MDB Photos</Text>
             <PhotoSectionView
               sectionTag="panel_mdb"
               photos={photos}
               locked={locked}
               onCapture={src => handlePhotoAction('panel_mdb', src)}
+              onRemove={removePhoto}
+            />
+          </View>
+          <View style={{ marginTop: space.sm }}>
+            <Text style={{ fontWeight: '700', marginBottom: space.xs }}>EB Meter Photos</Text>
+            <PhotoSectionView
+              sectionTag="eb_meter"
+              photos={photos}
+              locked={locked}
+              onCapture={src => handlePhotoAction('eb_meter', src)}
               onRemove={removePhoto}
             />
           </View>
@@ -1132,8 +1204,20 @@ export default function SurveyFormScreen() {
           ))}
 
           <Text style={{ fontSize: font.small, color: colors.muted, marginTop: space.sm }}>
-            Items are auto-ticked when corresponding photos are uploaded below.
+            Items are auto-ticked when the matching photo is attached. Mandatory for this site type:{' '}
+            {required.map(t => `${PHOTO_LABELS[t]}${hasPhoto(t) ? ' ✓' : ''}`).join(', ') || 'none'}.
           </Text>
+
+          <View style={{ marginTop: space.md }}>
+            <Text style={{ fontWeight: '700', marginBottom: space.xs }}>Customer ID Proof / GST Certificate</Text>
+            <PhotoSectionView
+              sectionTag="id_proof"
+              photos={photos}
+              locked={locked}
+              onCapture={src => handlePhotoAction('id_proof', src)}
+              onRemove={removePhoto}
+            />
+          </View>
 
           {/* General Survey Photos Gallery */}
           <View style={{ marginTop: space.md }}>
@@ -1193,6 +1277,15 @@ export default function SurveyFormScreen() {
               await setSignature('engineer', uri)
             }}
           />
+
+          <Field label="Customer Representative Name *">
+            <Input
+              value={s8.customerRepName ?? s1.contactPerson ?? ''}
+              editable={!locked}
+              placeholder="Name of the person signing"
+              onChangeText={(t: string) => setSection('section8', { customerRepName: t })}
+            />
+          </Field>
 
           {/* Customer Signature Pad */}
           <SignaturePad

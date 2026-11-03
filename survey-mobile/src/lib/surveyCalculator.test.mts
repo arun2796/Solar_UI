@@ -3,7 +3,7 @@
 // Run: npm test   (Node's built-in test runner; no extra packages)
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { calculateSurvey, DEFAULT_SETTINGS, settingsFromApi } from './surveyCalculator.ts'
+import { calculateSurvey, DEFAULT_SETTINGS, settingsFromApi, shadowFreeSunHours, tariffRate } from './surveyCalculator.ts'
 
 const sun = (a: boolean, b: boolean, c: boolean) => ({ sunExposure8to10: a, sunExposure10to2: b, sunExposure2to5: c })
 
@@ -94,4 +94,20 @@ test('constants come from the admin settings (API key names)', () => {
   assert.equal(r.capacityByConsumptionKw, 24)     // 120 ÷ 5
   assert.equal(r.capacityByRoofKw, 30)            // 2,400 ÷ 80
   assert.equal(r.monthlySavingsRs, 24 * 5 * 30 * 8) // the admin's LT-2 tariff (₹8)
+})
+
+test('sun hours entered per band replace the yes/no bands', () => {
+  assert.equal(shadowFreeSunHours({ sunHours8to10: 1.5, sunHours10to2: 4, sunHours2to5: 0 } as never), 5.5)
+  assert.equal(shadowFreeSunHours({ sunHours10to2: 4, ...sun(true, true, true) } as never), 4)   // entered hours win
+  assert.equal(shadowFreeSunHours({} as never), null)
+  const r = calculateSurvey({ history24MonthsUnits: 21_900, tariffCategory: 'LT-1' } as never, { roofLengthFt: 30, roofWidthFt: 25 } as never,
+    { sunHours8to10: 1, sunHours10to2: 3, sunHours2to5: 1 } as never, {} as never)
+  assert.equal(r.isShadowRisk, true)                                                         // 5 h < 6
+})
+
+test('the tariff from the bill wins over the category rate', () => {
+  assert.equal(tariffRate('LT-2', DEFAULT_SETTINGS, 8.25), 8.25)
+  assert.equal(tariffRate('LT-2', DEFAULT_SETTINGS, null), 7)
+  const r = calculateSurvey({ history24MonthsUnits: 87_600, tariffCategory: 'LT-2', tariffRateRs: 8 } as never, { roofLengthFt: 60, roofWidthFt: 40 } as never, {} as never, {} as never)
+  assert.equal(r.monthlySavingsRs, 3_600 * 8)
 })

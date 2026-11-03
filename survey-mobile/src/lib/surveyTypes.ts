@@ -78,6 +78,7 @@ export interface SurveySection2 {
   netMetering: boolean
   history24MonthsUnits: number | null
   history24MonthsAmount: number | null
+  tariffRateRs?: number | null      // ₹ per unit from the bill; when empty the category's rate (admin setting) is used
 }
 
 export interface SurveySection3 {
@@ -93,6 +94,7 @@ export interface SurveySection3 {
   obstructionAreas: ObstructionAreaItem[]
   waterproofingStatus: string
   materialAccess: MaterialAccess
+  obstructionsDescription?: string  // what the obstructions are (water tank, lift room…)
 }
 
 export interface SurveySection4 {
@@ -103,6 +105,10 @@ export interface SurveySection4 {
   sunExposure8to10: boolean
   sunExposure10to2: boolean
   sunExposure2to5: boolean
+  // Sunny hours entered per band (0–2, 0–4, 0–3). When any is entered they replace the yes/no bands above.
+  sunHours8to10?: number | null
+  sunHours10to2?: number | null
+  sunHours2to5?: number | null
 }
 
 export interface SurveySection5 {
@@ -144,6 +150,7 @@ export interface SurveySection8 {
   customerSignatureDate: string | null
   engineerSigned: boolean
   customerSigned: boolean
+  customerRepName?: string          // the person who signs for the customer
 }
 
 export interface SurveySection9 {

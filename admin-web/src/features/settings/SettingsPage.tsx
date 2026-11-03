@@ -99,6 +99,9 @@ const SURVEY_CONSTANTS = [
   { key: 'days_in_24_months', label: 'Days in 24 months', hint: 'Default 730' },
   { key: 'days_in_month', label: 'Days per month', hint: 'Default 30' },
 ]
+// Photos the engineer must attach before Submit, per site type (setting mandatory_photos_<siteType>, comma-separated).
+const SITE_TYPES = [['gated_community', 'Gated community'], ['commercial', 'Commercial'], ['industrial', 'Industrial'], ['maintenance', 'Maintenance']] as const
+const PHOTO_TAGS = [['eb_bill', 'EB bill'], ['roof', 'Roof'], ['shadow', 'Shadow areas'], ['panel_mdb', 'Main panel / MDB'], ['eb_meter', 'EB meter'], ['id_proof', 'ID proof']] as const
 const SURVEY_TARIFFS = [
   { key: 'tariff_lt1', label: 'LT-1' }, { key: 'tariff_lt2', label: 'LT-2' }, { key: 'tariff_lt3', label: 'LT-3' }, { key: 'tariff_ht', label: 'HT' },
 ]
@@ -166,6 +169,27 @@ function SurveySettingsCard() {
               {SURVEY_TARIFFS.map(c => <Field key={c.key} label={c.label}>
                 <Input type="number" step="any" min="0" value={form[c.key] ?? ''} onChange={e => setVal(c.key, e.target.value)} required />
               </Field>)}
+            </div>
+          </div>
+
+          <div className="border-t border-slate-200 pt-2">
+            <h3 className="mb-1 text-sm font-semibold text-slate-800">Mandatory photos before Submit</h3>
+            <p className="mb-2 text-xs text-slate-500">The app and the server refuse Submit until these photos are attached.</p>
+            <div className="overflow-x-auto">
+              <table className="text-sm">
+                <thead><tr><th className="pr-4 text-left font-medium text-slate-600">Site type</th>{PHOTO_TAGS.map(([, l]) => <th key={l} className="px-2 text-xs font-medium text-slate-600">{l}</th>)}</tr></thead>
+                <tbody>{SITE_TYPES.map(([type, label]) => {
+                  const key = `mandatory_photos_${type}`
+                  const tags = (form[key] ?? '').split(',').map(t => t.trim()).filter(Boolean)
+                  const toggle = (tag: string) => setVal(key, (tags.includes(tag) ? tags.filter(t => t !== tag) : [...tags, tag]).join(','))
+                  return <tr key={type} className="border-t border-slate-100">
+                    <td className="py-1.5 pr-4 font-medium text-slate-700">{label}</td>
+                    {PHOTO_TAGS.map(([tag, l]) => <td key={tag} className="px-2 text-center">
+                      <input type="checkbox" aria-label={`${label}: ${l}`} checked={tags.includes(tag)} onChange={() => toggle(tag)} className="h-4 w-4 accent-sky-700" />
+                    </td>)}
+                  </tr>
+                })}</tbody>
+              </table>
             </div>
           </div>
 
