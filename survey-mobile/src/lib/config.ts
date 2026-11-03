@@ -10,15 +10,17 @@ if (!BUILT_API_URL) console.warn('EXPO_PUBLIC_API_URL is not set; see .env.devel
 
 let apiUrl = BUILT_API_URL
 
-// Load any runtime override stored by the engineer
-try {
-  SecureStore.getItemAsync(OVERRIDE_KEY).then(raw => {
-    if (raw) {
-      const fixed = raw.replace(/:(8081|8082|8083|8084)$/, ':5000')
-      apiUrl = fixed
-    }
-  }).catch(() => {})
-} catch {}
+// Load any runtime override stored by the engineer (test builds only)
+if (API_URL_EDITABLE) {
+  try {
+    SecureStore.getItemAsync(OVERRIDE_KEY).then(raw => {
+      if (raw) {
+        const fixed = raw.replace(/:(8081|8082|8083|8084)$/, ':5000')
+        apiUrl = fixed
+      }
+    }).catch(() => {})
+  } catch {}
+}
 
 export const config = {
   get apiUrl() { return apiUrl },

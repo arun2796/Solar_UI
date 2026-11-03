@@ -12,6 +12,11 @@
       "android": { "buildType": "apk" },
       "env": { "EXPO_PUBLIC_API_URL": "http://10.0.2.2:5000", "EXPO_PUBLIC_DEV_LOGIN": "true" }
     },
+    "preview": {
+      "distribution": "internal",
+      "android": { "buildType": "apk" },
+      "env": { "APP_VARIANT": "production", "NODE_ENV": "production", "EXPO_PUBLIC_API_URL": "https://REPLACE-WITH-YOUR-API-HOST", "EXPO_PUBLIC_DEV_LOGIN": "false" }
+    },
     "production-apk": {
       "distribution": "internal",
       "android": { "buildType": "apk" },
