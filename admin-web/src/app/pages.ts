@@ -14,4 +14,4 @@ export const DefectSummaryPage = lazy(() => import('../features/defects/DefectSu
 export const SettingsPage = lazy(() => import('../features/settings/SettingsPage'))
 export const SurveysPage = lazy(() => import('../features/surveys/SurveysPage'))
 export const SurveyDetailPage = lazy(() => import('../features/surveys/SurveyDetailPage'))
-
+export const UsersPage = lazy(() => import('../features/users/UsersPage'))

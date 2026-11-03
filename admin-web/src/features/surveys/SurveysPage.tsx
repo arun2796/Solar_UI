@@ -7,12 +7,14 @@ import { clampPage, fmtDateTime } from '../../lib/format'
 import type { SurveyStatus } from '../../lib/types'
 import { Badge, Button, EmptyState, ErrorState, PageHeader, Pagination, Select, Skeleton, Table } from '../../components/ui'
 import { SearchBox } from '../../components/SearchBox'
+import { useRole } from '../../lib/useMe'
 import { NewAssignedSurveyModal } from './NewAssignedSurveyModal'
 
 export default function SurveysPage() {
   const [sp, setSp] = useSearchParams()
   const nav = useNavigate()
   const [createModalOpen, setCreateModalOpen] = useState(false)
+  const isAdmin = useRole() === 'admin'   // management: read-only list, no new tasks, export or engineer list
 
   const g = (k: string) => sp.get(k) ?? ''
   const set = (k: string, v: string) => {
@@ -38,7 +40,7 @@ export default function SurveysPage() {
   }
 
   const list = useQuery({ queryKey: ['surveys', params], queryFn: () => api.surveys.list(params) })
-  const engineers = useQuery({ queryKey: ['engineers', 'all'], queryFn: () => api.engineers.list() })
+  const engineers = useQuery({ queryKey: ['engineers', 'all'], queryFn: () => api.engineers.list(), enabled: isAdmin })
 
   const filtered = !!(g('q') || g('engineer') || g('status') || g('siteType') || g('verdict') || g('from') || g('to'))
 
@@ -83,8 +85,8 @@ export default function SurveysPage() {
     <>
       <PageHeader
         title="Site surveys"
-        subtitle="Manage rooftop solar site feasibility surveys, task assignments, reviews and proposals"
-        actions={
+        subtitle={isAdmin ? 'Manage rooftop solar site feasibility surveys, task assignments, reviews and proposals' : 'Rooftop solar site feasibility surveys (read-only): open a survey to approve it for proposal or comment'}
+        actions={isAdmin &&
           <div className="flex gap-2">
             <Button onClick={() => setCreateModalOpen(true)}>
               <Plus className="mr-1.5 h-4 w-4" /> New assigned survey
@@ -126,15 +128,17 @@ export default function SurveysPage() {
           className="md:col-span-2"
         />
 
-        <Select aria-label="Engineer" value={g('engineer')} onChange={e => set('engineer', e.target.value)}>
-          <option value="">All engineers</option>
-          {engineers.data?.map(e => (
-            <option key={e.id} value={e.id}>
-              {e.name}
-              {e.isActive ? '' : ' (inactive)'}
-            </option>
-          ))}
-        </Select>
+        {isAdmin && (
+          <Select aria-label="Engineer" value={g('engineer')} onChange={e => set('engineer', e.target.value)}>
+            <option value="">All engineers</option>
+            {engineers.data?.map(e => (
+              <option key={e.id} value={e.id}>
+                {e.name}
+                {e.isActive ? '' : ' (inactive)'}
+              </option>
+            ))}
+          </Select>
+        )}
 
         <Select aria-label="Status" value={g('status')} onChange={e => set('status', e.target.value)}>
           <option value="">All statuses</option>
@@ -268,7 +272,7 @@ export default function SurveysPage() {
         </>
       )}
 
-      <NewAssignedSurveyModal open={createModalOpen} onClose={() => setCreateModalOpen(false)} />
+      {isAdmin && <NewAssignedSurveyModal open={createModalOpen} onClose={() => setCreateModalOpen(false)} />}
     </>
   )
 }

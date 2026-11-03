@@ -1,6 +1,7 @@
 // Mirrors backend/Application/Dtos/Dtos.cs (camelCase JSON)
 export type Paged<T> = { items: T[]; page: number; pageSize: number; total: number }
-export type Me = { userId: string; role: 'admin' | 'engineer' | 'management'; engineerId?: string | null; engineerName?: string | null; email?: string | null }
+export type Role = 'admin' | 'engineer' | 'management'
+export type Me = { userId: string; role: Role; engineerId?: string | null; engineerName?: string | null; email?: string | null }
 
 export type SurveyStatus = 'assigned' | 'draft' | 'submitted' | 'reviewed' | 'proposal_sent' | 'won' | 'lost'
 export type SurveyVerdict = 'FEASIBLE' | 'CONDITIONAL' | 'NOT_FEASIBLE'
@@ -91,7 +92,13 @@ export type SurveyDetail = {
   googleMapsUrl?: string | null
   plannedVisitDate?: string | null
   assignmentNotes?: string | null
+  approvedForProposalBy?: string | null
+  approvedForProposalByName?: string | null
+  approvedForProposalAt?: string | null
 }
+
+/** Office / management discussion on a survey (never shown to engineers). */
+export type SurveyComment = { id: string; surveyId: string; userId?: string | null; authorName: string; authorRole?: Role | null; body: string; createdAt: string }
 
 export type SurveyTaskCreate = {
   customerType: 'Commercial' | 'Individual'
@@ -126,6 +133,10 @@ export type Client = {
   isActive: boolean; createdAt: string; updatedAt: string
 }
 export type ClientUpsert = Omit<Client, 'id' | 'isActive' | 'createdAt' | 'updatedAt' | 'amcStatus'> & { amcStatus?: AmcStatus | null }
+
+/** Sign-in account. Admin and management accounts are managed on the Users page, engineers on the Engineers page. */
+export type AppUser = { id: string; name?: string | null; email?: string | null; role: Role; isActive: boolean; hasPassword: boolean; engineerId?: string | null; lastLoginAt?: string | null; createdAt: string }
+export type UserCreate = { name?: string | null; email: string; password: string; role: 'admin' | 'management' }
 
 export type Engineer = { id: string; name: string; phone?: string | null; email: string; employeeCode?: string | null; isActive: boolean; userId?: string | null; hasPassword?: boolean; createdAt: string }
 
