@@ -88,5 +88,175 @@ export default function SettingsPage() {
             {pwMsg && <Notice tone={pwMsg.ok ? 'success' : 'error'} className="mt-2">{pwMsg.text}</Notice>}</>}</Card>
       </div>
     </div>
+
+    {/* Site Survey Calculation Constants */}
+    <div className="mt-6">
+      <SurveySettingsCard />
+    </div>
   </>
 }
+
+function SurveySettingsCard() {
+  const qc = useQueryClient()
+  const q = useQuery({
+    queryKey: ['survey-settings'],
+    queryFn: api.surveys.settings.get,
+  })
+
+  const [form, setForm] = useState<Record<string, string>>({})
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+
+  useEffect(() => {
+    if (q.data) {
+      setForm(q.data)
+    }
+  }, [q.data])
+
+  const saveMutation = useMutation({
+    mutationFn: (d: Record<string, string>) => api.surveys.settings.update(d),
+    onSuccess: () => {
+      setMsg({ ok: true, text: 'Site survey calculation settings updated successfully.' })
+      void qc.invalidateQueries({ queryKey: ['survey-settings'] })
+    },
+    onError: (err) => {
+      setMsg({ ok: false, text: errorMessage(err) })
+    },
+  })
+
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault()
+    setMsg(null)
+    saveMutation.mutate(form)
+  }
+
+  const setVal = (k: string, v: string) => {
+    setForm(prev => ({ ...prev, [k]: v }))
+  }
+
+  return (
+    <Card>
+      <div className="mb-4">
+        <h2 className="text-lg font-semibold text-slate-900">Site survey calculation constants</h2>
+        <p className="text-sm text-slate-500">
+          Formulas used by the mobile app and server to calculate recommended system size, panel count, generation, and savings.
+        </p>
+      </div>
+
+      {q.isLoading ? (
+        <Skeleton rows={4} />
+      ) : q.isError ? (
+        <ErrorState message={errorMessage(q.error)} onRetry={() => q.refetch()} />
+      ) : (
+        <form onSubmit={handleSave} className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-3">
+            <Field label="Sq.ft required per kW (sqft_per_kw)">
+              <Input
+                type="number"
+                step="any"
+                value={form.sqft_per_kw ?? '100'}
+                onChange={e => setVal('sqft_per_kw', e.target.value)}
+                required
+              />
+            </Field>
+
+            <Field label="Default Panel Wattage (panel_wp)">
+              <Input
+                type="number"
+                step="1"
+                value={form.panel_wp ?? '550'}
+                onChange={e => setVal('panel_wp', e.target.value)}
+                required
+              />
+            </Field>
+
+            <Field label="Avg. Peak Sun Hours / Day">
+              <Input
+                type="number"
+                step="0.1"
+                value={form.avg_daily_generation_hours ?? '4'}
+                onChange={e => setVal('avg_daily_generation_hours', e.target.value)}
+                required
+              />
+            </Field>
+
+            <Field label="Days per Month (days_per_month)">
+              <Input
+                type="number"
+                step="1"
+                value={form.days_per_month ?? '30'}
+                onChange={e => setVal('days_per_month', e.target.value)}
+                required
+              />
+            </Field>
+
+            <Field label="Cable Buffer Multiplier">
+              <Input
+                type="number"
+                step="0.05"
+                value={form.cable_buffer_multiplier ?? '1.2'}
+                onChange={e => setVal('cable_buffer_multiplier', e.target.value)}
+                required
+              />
+            </Field>
+
+            <Field label="Max Inverter-to-MDB Dist (m)">
+              <Input
+                type="number"
+                step="1"
+                value={form.max_inverter_to_mdb_distance_m ?? '50'}
+                onChange={e => setVal('max_inverter_to_mdb_distance_m', e.target.value)}
+              />
+            </Field>
+          </div>
+
+          <div className="pt-2 border-t border-slate-200">
+            <h3 className="text-sm font-semibold text-slate-800 mb-2">Default Tariff Category Rates (₹ / Unit)</h3>
+            <div className="grid gap-4 sm:grid-cols-4">
+              <Field label="LT-1 Rate (₹)">
+                <Input
+                  type="number"
+                  step="0.1"
+                  value={form.tariff_lt1 ?? '4.5'}
+                  onChange={e => setVal('tariff_lt1', e.target.value)}
+                />
+              </Field>
+              <Field label="LT-2 Rate (₹)">
+                <Input
+                  type="number"
+                  step="0.1"
+                  value={form.tariff_lt2 ?? '7.0'}
+                  onChange={e => setVal('tariff_lt2', e.target.value)}
+                />
+              </Field>
+              <Field label="LT-3 Rate (₹)">
+                <Input
+                  type="number"
+                  step="0.1"
+                  value={form.tariff_lt3 ?? '9.5'}
+                  onChange={e => setVal('tariff_lt3', e.target.value)}
+                />
+              </Field>
+              <Field label="HT Rate (₹)">
+                <Input
+                  type="number"
+                  step="0.1"
+                  value={form.tariff_ht ?? '8.0'}
+                  onChange={e => setVal('tariff_ht', e.target.value)}
+                />
+              </Field>
+            </div>
+          </div>
+
+          {msg && <Notice tone={msg.ok ? 'success' : 'error'}>{msg.text}</Notice>}
+
+          <div className="flex justify-end pt-2">
+            <Button type="submit" loading={saveMutation.isPending}>
+              Save Calculation Settings
+            </Button>
+          </div>
+        </form>
+      )}
+    </Card>
+  )
+}
+

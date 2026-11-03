@@ -1,7 +1,7 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { AdminGuard } from './AdminShell'
 import LoginPage from '../features/auth/LoginPage'
-import { AmcPage, CalendarPage, ClientDetailPage, ClientsPage, DashboardPage, DefectSummaryPage, EngineersPage, ReportDetailPage, ReportsPage, SettingsPage, UpcomingOverduePage } from './pages'
+import { AmcPage, CalendarPage, ClientDetailPage, ClientsPage, DashboardPage, DefectSummaryPage, EngineersPage, ReportDetailPage, ReportsPage, SettingsPage, SurveyDetailPage, SurveysPage, UpcomingOverduePage } from './pages'
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -9,6 +9,8 @@ export const router = createBrowserRouter([
   {
     path: '/', element: <AdminGuard />, children: [
       { index: true, element: <DashboardPage /> },
+      { path: 'surveys', element: <SurveysPage /> },
+      { path: 'surveys/:id', element: <SurveyDetailPage /> },
       { path: 'reports', element: <ReportsPage /> },
       { path: 'reports/:id', element: <ReportDetailPage /> },
       { path: 'clients', element: <ClientsPage /> },

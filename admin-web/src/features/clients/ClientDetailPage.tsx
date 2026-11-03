@@ -17,6 +17,7 @@ export default function ClientDetailPage() {
   const [page, setPage] = useState(1)
   const client = useQuery({ queryKey: ['client', id], queryFn: () => api.clients.get(id) })
   const reports = useQuery({ queryKey: ['reports', { clientId: id, page }], queryFn: () => api.reports.list({ clientId: id, page, pageSize: HISTORY_PAGE }) })
+  const surveys = useQuery({ queryKey: ['surveys', { clientId: id }], queryFn: () => api.surveys.list({ clientId: id, pageSize: 10 }) })
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<AppointmentDraft | null>(null)
   const visitsQ = useQuery({ queryKey: ['appointments', { clientId: id }], queryFn: () => api.appointments.list({ from: addDaysIso(-30), to: addDaysIso(365), clientId: id }) })
@@ -48,6 +49,17 @@ export default function ClientDetailPage() {
           { h: 'Ref', cell: r => r.reportRef ?? <span className="text-slate-400">draft</span> }, { h: 'Visit', cell: r => fmtDate(r.visitDate) }, { h: 'Engineer', cell: r => r.engineerName },
           { h: 'Status', cell: r => <Badge tone={statusTone(r.status)}>{r.status}</Badge> }, { h: 'Defects', cell: r => r.defectCount || '—' }, { h: 'Next visit', cell: r => fmtDate(r.nextVisitDate) }]} />
         {reports.data!.total > HISTORY_PAGE && <Pagination page={page} pageSize={HISTORY_PAGE} total={reports.data!.total} onPage={setPage} />}</>}</Card>
+    <Card className="mt-4"><h2 className="mb-3 font-semibold">Site surveys</h2>
+      {surveys.isLoading ? <Skeleton rows={2} /> : surveys.isError ? <ErrorState message={errorMessage(surveys.error)} onRetry={() => surveys.refetch()} /> : surveys.data!.items.length === 0 ? <p className="text-sm text-slate-500">No site surveys for this client yet.</p> :
+        <Table rows={surveys.data!.items} keyOf={s => s.id} onRow={s => nav(`/surveys/${s.id}`)} rowLabel={s => `Open survey ${s.surveyRef ?? 'draft'}`} cols={[
+          { h: 'Ref', cell: s => s.surveyRef ?? <span className="text-slate-400">draft</span> },
+          { h: 'Visit date', cell: s => fmtDate(s.createdAt) },
+          { h: 'Engineer', cell: s => s.engineerName },
+          { h: 'Capacity', cell: s => s.recommendedSystemSizeKw ? `${s.recommendedSystemSizeKw} kW` : '—' },
+          { h: 'Verdict', cell: s => s.verdict ? <Badge tone={s.verdict === 'FEASIBLE' ? 'green' : s.verdict === 'CONDITIONAL' ? 'amber' : 'red'}>{s.verdict}</Badge> : '—' },
+          { h: 'Status', cell: s => <Badge tone="blue">{s.status.toUpperCase()}</Badge> },
+        ]} />}
+    </Card>
     <Modal open={editing} title="Edit client" onClose={() => setEditing(false)} wide closeOnBackdrop={false}>
       <ClientForm initial={c} onSubmit={d => update.mutate(d)} busy={update.isPending} onCancel={() => setEditing(false)} error={update.error ? errorMessage(update.error) : null} /></Modal>
     <AppointmentModal draft={draft} onClose={() => setDraft(null)} />

@@ -103,4 +103,92 @@ export const api = {
       }
     },
   },
+  surveys: {
+    list: async (params?: { status?: string; page?: number; pageSize?: number }) => {
+      const r = await http.get<Paged<any>>('/surveys', { params: { pageSize: 100, ...params } })
+      return r.data
+    },
+    get: (id: string) => http.get<any>(`/surveys/${id}`).then(r => r.data),
+    create: async (dto: {
+      clientLocalId: string
+      clientId?: string | null
+      customerName: string
+      siteAddress: string
+      siteType: string
+      dateOfVisit: string
+      gpsLatitude?: number | null
+      gpsLongitude?: number | null
+      gpsAccuracy?: number | null
+    }) => {
+      const r = await http.post<any>('/surveys', dto)
+      return { survey: r.data, created: r.status === 201 }
+    },
+    update: (id: string, version: number, data: any, overrides?: any) =>
+      http.put<any>(`/surveys/${id}`, { version, data, overrides }).then(r => r.data),
+    signature: async (id: string, kind: 'engineer' | 'customer', fileUri: string) => {
+      const form = new FormData()
+      form.append('file', { uri: fileUri, name: `${kind}.png`, type: 'image/png' } as unknown as Blob)
+      return http.post<any>(`/surveys/${id}/signatures/${kind}`, form, { timeout: 60_000 }).then(r => r.data)
+    },
+    photo: async (
+      id: string,
+      params: {
+        sectionNumber: number
+        tag?: string | null
+        caption?: string | null
+        latitude?: number | null
+        longitude?: number | null
+        takenAt?: string | null
+        fileUri: string
+      }
+    ) => {
+      const form = new FormData()
+      form.append('sectionNumber', String(params.sectionNumber))
+      if (params.tag) form.append('tag', params.tag)
+      if (params.caption) form.append('caption', params.caption)
+      if (params.latitude != null) form.append('latitude', String(params.latitude))
+      if (params.longitude != null) form.append('longitude', String(params.longitude))
+      if (params.takenAt) form.append('takenAt', params.takenAt)
+      form.append('file', {
+        uri: params.fileUri,
+        name: `photo-${Date.now()}.jpg`,
+        type: 'image/jpeg',
+      } as unknown as Blob)
+      return http.post<any>(`/surveys/${id}/photos`, form, { timeout: 60_000 }).then(r => r.data)
+    },
+    deletePhoto: (id: string, photoId: string) =>
+      http.delete(`/surveys/${id}/photos/${photoId}`).then(() => undefined),
+    submit: (id: string, version: number, data: any, overrides?: any) =>
+      http.post<any>(`/surveys/${id}/submit`, { version, data, overrides }).then(r => r.data),
+    downloadPdf: async (id: string, fileName: string): Promise<File> => {
+      const safeName = fileName.replace(/[^\w.-]+/g, '_')
+      const attempt = async (token: string | null) => {
+        if (!token) throw new Error('You are signed out. Sign in again to download the PDF.')
+        const dest = new File(Paths.cache, safeName)
+        if (dest.exists) dest.delete()
+        return File.downloadFileAsync(`${config.apiUrl}/surveys/${id}/pdf?download=true`, dest, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+      }
+      try {
+        return await attempt(await accessToken())
+      } catch (e) {
+        const msg = String((e as Error)?.message ?? e)
+        if (/signed out/.test(msg)) throw e
+        if (/401/.test(msg)) {
+          const t = await refreshedToken()
+          if (t) return attempt(t)
+        }
+        if (/401|403/.test(msg)) throw new Error('Not allowed to download this survey PDF. Sign in again.')
+        if (/404/.test(msg)) throw new Error('Survey not found on the server.')
+        if (/5\d\d/.test(msg)) throw new Error('The server could not create the PDF. Try again shortly.')
+        throw new Error('Could not download the PDF. Check the connection and try again.')
+      }
+    },
+    shareLink: (id: string) =>
+      http.post<{ url: string; expiresAt: string }>(`/surveys/${id}/share-link`).then(r => r.data),
+    email: (id: string, email?: string) =>
+      http.post<{ message: string }>(`/surveys/${id}/email`, { email }).then(r => r.data),
+    settings: () => http.get<Record<string, string>>('/surveys/settings').then(r => r.data),
+  },
 }

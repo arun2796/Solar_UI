@@ -3,7 +3,7 @@ import type { DevUser } from './devAuth'
 import { accessToken, API_URL, logout, refresh, setSession, type AuthResponse } from './session'
 import { queryClient } from './queryClient'
 import { SECTIONS } from './types'
-import type { Appointment, AppointmentUpsert, Client, ClientUpsert, Company, DashboardSummary, DefectSummaryItem, Engineer, Me, Paged, Report, ReportFields, ReportListItem, ScheduleItem, ShareLink } from './types'
+import type { Appointment, AppointmentUpsert, Client, ClientUpsert, Company, DashboardSummary, DefectSummaryItem, Engineer, Me, Paged, Report, ReportFields, ReportListItem, ScheduleItem, ShareLink, SurveyDetail, SurveyListItem, SurveyReassign, SurveyTaskCreate } from './types'
 
 export { API_URL }
 
@@ -142,5 +142,24 @@ export const api = {
     get: () => http.get<Company>('/company').then(r => r.data),
     update: (d: Omit<Company, 'logoUrl' | 'updatedAt'>) => http.put<Company>('/company', d).then(r => r.data),
     logo: (file: File) => { const f = new FormData(); f.append('file', file); return http.post<Company>('/company/logo', f).then(r => r.data) },
+  },
+  surveys: {
+    list: (p: { search?: string; engineerId?: string; clientId?: string; from?: string; to?: string; status?: string; siteType?: string; verdict?: string; page?: number; pageSize?: number; sort?: string }) =>
+      http.get<Paged<SurveyListItem>>('/surveys', { params: q(p) }).then(r => r.data),
+    get: (id: string) => http.get<SurveyDetail>(`/surveys/${id}`).then(r => r.data),
+    createTask: (d: SurveyTaskCreate) => http.post<SurveyDetail>('/surveys/tasks', d).then(r => r.data),
+    reassign: (id: string, d: SurveyReassign) => http.post<SurveyDetail>(`/surveys/${id}/reassign`, d).then(r => r.data),
+    update: (id: string, d: { version: number; data: any; overrides?: any }) =>
+      http.put<SurveyDetail>(`/surveys/${id}`, d).then(r => r.data),
+    updateStatus: (id: string, d: { status: string; internalComments?: string | null }) =>
+      http.post<SurveyDetail>(`/surveys/${id}/status`, d).then(r => r.data),
+    pdfUrl: (id: string, download = false) => `${API_URL}/surveys/${id}/pdf${download ? '?download=true' : ''}`,
+    pdfBlob: (id: string) => http.get(`/surveys/${id}/pdf`, { responseType: 'blob', timeout: 90_000 }).then(r => r.data as Blob, unblobError),
+    shareLink: (id: string) => http.post<{ url: string; expiresAt: string }>(`/surveys/${id}/share-link`).then(r => r.data),
+    email: (id: string, email?: string) => http.post<{ message: string }>(`/surveys/${id}/email`, { email }).then(r => r.data),
+    settings: {
+      get: () => http.get<Record<string, string>>('/surveys/settings').then(r => r.data),
+      update: (d: Record<string, string>) => http.put<Record<string, string>>('/surveys/settings', d).then(r => r.data),
+    },
   },
 }
