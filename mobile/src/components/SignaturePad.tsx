@@ -29,7 +29,7 @@ export function SignaturePad({ title, filePrefix, onSaved, existingUri, disabled
       setMsg({ text: 'Could not save the signature. Try again.', ok: false })
     } finally { setBusy(false) }
   }
-  const style = `.m-signature-pad { box-shadow: none; border: none; width: 100%; height: 100%; } .m-signature-pad--body { border: none; width: 100%; height: 100%; } .m-signature-pad--body canvas { touch-action: none; -ms-touch-action: none; width: 100%; height: 100%; } .m-signature-pad--footer { display: none; } body,html { background: #fff; margin: 0; padding: 0; overflow: hidden; touch-action: none; -ms-touch-action: none; -webkit-user-select: none; user-select: none; }`
+  const style = `.m-signature-pad { box-shadow: none; border: none; } .m-signature-pad--body { border: none; } .m-signature-pad--footer { display: none; } body,html { background: #fff; }`
   const hasError = !!error && !existingUri
 
   return <View style={{ marginBottom: space.lg }}>
@@ -41,7 +41,6 @@ export function SignaturePad({ title, filePrefix, onSaved, existingUri, disabled
       <View style={{ height: 220, borderWidth: 2, borderColor: hasError ? colors.danger : colors.border, borderRadius: 10, overflow: 'hidden', backgroundColor: '#fff' }}>
         <SignatureScreen ref={ref} onOK={handleOK} onEmpty={() => { setBusy(false); setMsg({ text: 'The pad is empty — sign first, then tap Save.', ok: false }) }}
           onBegin={() => onDrawing?.(true)} onEnd={() => onDrawing?.(false)}
-          nestedScrollEnabled={false}
           webStyle={style} backgroundColor="#ffffff" penColor={colors.text} descriptionText="" imageType="image/png" autoClear={false} />
       </View>
       <View style={{ flexDirection: 'row', gap: space.sm, marginTop: space.sm }}>

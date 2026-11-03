@@ -24,46 +24,26 @@ const MAX_ATTEMPTS = 8
 const CLIENTS_REFRESH_MS = 30 * 60_000
 const backoff = (n: number) => Math.min(10 * 60_000, 5000 * 2 ** Math.max(0, n - 1))
 
-import { runSurveySync } from './surveySyncEngine'
-
 export function startSyncEngine() {
   const unsubNet = NetInfo.addEventListener(s => {
     // isInternetReachable is null while unknown (e.g. at start-up): only an explicit false means offline.
     const online = s.isConnected !== false && s.isInternetReachable !== false
     syncStore.set({ net: online ? 'online' : 'offline' })
-    if (online) {
-      void runSync()
-      void runSurveySync()
-    }
+    if (online) void runSync()
   })
-  const sub = AppState.addEventListener('change', st => {
-    if (st === 'active') {
-      void runSync()
-      void runSurveySync()
-    }
-  })
+  const sub = AppState.addEventListener('change', st => { if (st === 'active') void runSync() })
   const owner = currentUserId()
-  void (owner ? drafts.claimOrphans(owner) : Promise.resolve()).then(() => {
-    void runSync()
-    void runSurveySync()
-  })
+  void (owner ? drafts.claimOrphans(owner) : Promise.resolve()).then(() => runSync())
   return () => { unsubNet(); sub.remove(); if (timer) { clearTimeout(timer); timer = null } }
 }
 
-export function scheduleSync(ms = 1500) {
-  if (timer) clearTimeout(timer)
-  timer = setTimeout(() => {
-    timer = null
-    void runSync()
-    void runSurveySync()
-  }, Math.max(0, ms))
-}
+export function scheduleSync(ms = 1500) { if (timer) clearTimeout(timer); timer = setTimeout(() => { timer = null; void runSync() }, Math.max(0, ms)) }
 
 /** User-initiated sync: failed drafts are re-queued, backoff is reset, and the offline flag is ignored (NetInfo can be wrong). */
 export async function syncNow(): Promise<void> {
   const owner = currentUserId(); if (!owner) return
   await drafts.retryNow(owner)
-  await Promise.all([runSync({ manual: true }), runSurveySync()])
+  await runSync({ manual: true })
 }
 
 export async function runSync(opts: { manual?: boolean } = {}): Promise<void> {

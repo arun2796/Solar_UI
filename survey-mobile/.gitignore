@@ -45,3 +45,7 @@ example
 .env
 android/
 ios/
+
+# editor / tool folders
+.idea/
+.claude/

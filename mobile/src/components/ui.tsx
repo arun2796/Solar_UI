@@ -112,33 +112,13 @@ export function NotFound({ text = 'This draft is no longer on the device.', onBa
   return <Screen><Empty text={text} /><Button title="Go to Home" variant="secondary" onPress={onBack} /></Screen>
 }
 
-export function StateBadge({ state }: { state?: string | null }) {
-  const map: Record<string, [string, string, string]> = {
-    local: ['Saved on phone', colors.warnSoft, colors.warn],
-    syncing: ['Syncing', colors.infoSoft, colors.info],
-    synced: ['Synced', colors.goodSoft, colors.good],
-    submitting: ['Submitting', colors.infoSoft, colors.info],
-    submitted: ['Submitted', colors.goodSoft, colors.good],
-    failed: ['Sync failed', colors.defectSoft, colors.defect],
-    conflict: ['Conflict', colors.defectSoft, colors.defect],
-    elsewhere: ['Submitted elsewhere', colors.infoSoft, colors.info],
-    completed: ['Completed', colors.goodSoft, colors.good],
-    in_review: ['In review', colors.infoSoft, colors.info],
-    draft: ['Draft', colors.warnSoft, colors.warn],
-    approved: ['Approved', colors.goodSoft, colors.good],
-    rejected: ['Rejected', colors.defectSoft, colors.defect],
-  }
-  const key = state ? String(state).toLowerCase() : 'local'
-  const [t, bg, fg] = map[key] || [
-    state ? String(state).replace('_', ' ') : 'Saved',
-    colors.infoSoft,
-    colors.info,
-  ]
-  return (
-    <View style={{ backgroundColor: bg, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 }}>
-      <Text style={{ color: fg, fontSize: 14, fontWeight: '800' }}>{t}</Text>
-    </View>
-  )
+export function StateBadge({ state }: { state: DraftSyncState }) {
+  const map: Record<DraftSyncState, [string, string, string]> = {
+    local: ['Saved on phone', colors.warnSoft, colors.warn], syncing: ['Syncing', colors.infoSoft, colors.info], synced: ['Synced', colors.goodSoft, colors.good],
+    submitting: ['Submitting', colors.infoSoft, colors.info], submitted: ['Submitted', colors.goodSoft, colors.good], failed: ['Sync failed', colors.defectSoft, colors.defect],
+    conflict: ['Conflict', colors.defectSoft, colors.defect], elsewhere: ['Submitted elsewhere', colors.infoSoft, colors.info] }
+  const [t, bg, fg] = map[state]
+  return <View style={{ backgroundColor: bg, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 }}><Text style={{ color: fg, fontSize: 14, fontWeight: '800' }}>{t}</Text></View>
 }
 
 /** Section progress: numbered steps, ✓ when complete. With incomplete array, highlights incomplete sections in red tone. */

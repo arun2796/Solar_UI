@@ -23,7 +23,7 @@
       "package": "com.shreeabhi.solarmaintenance"
     },
     "web": {
-      "output": "single",
+      "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [

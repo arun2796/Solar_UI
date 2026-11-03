@@ -55,6 +55,8 @@ let _initPromise: Promise<StoreData> | null = null
 
 const now = () => new Date().toISOString()
 const DB_FILE = `${FileSystem.documentDirectory || ''}solar-survey-data.json`
+const DB_TMP = `${DB_FILE}.tmp`
+const DB_BACKUP = `${DB_FILE}.bak`
 
 const deleteFile = (uri?: string | null) => {
   if (!uri) return
@@ -77,26 +79,21 @@ async function getStore(): Promise<StoreData> {
         surveys: {},
         assignedTasks: {},
       }
-      try {
-        if (FileSystem.documentDirectory) {
-          const info = await FileSystem.getInfoAsync(DB_FILE)
-          if (info.exists) {
-            const raw = await FileSystem.readAsStringAsync(DB_FILE)
-            if (raw && raw.trim().length > 0) {
-              const parsed = JSON.parse(raw)
-              data = {
-                drafts: parsed.drafts || {},
-                clients: parsed.clients || {},
-                meta: parsed.meta || {},
-                surveyDrafts: parsed.surveyDrafts || {},
-                surveys: parsed.surveys || {},
-                assignedTasks: parsed.assignedTasks || {},
-              }
-            }
+      // The main file, else the copy kept from the previous good save. A file that cannot be read is never overwritten
+      // with an empty store: it is set aside (…corrupt-<time>.json) so nothing is lost silently.
+      for (const file of [DB_FILE, DB_BACKUP]) {
+        const parsed = await readStoreFile(file)
+        if (parsed) {
+          data = {
+            drafts: parsed.drafts || {},
+            clients: parsed.clients || {},
+            meta: parsed.meta || {},
+            surveyDrafts: parsed.surveyDrafts || {},
+            surveys: parsed.surveys || {},
+            assignedTasks: parsed.assignedTasks || {},
           }
+          break
         }
-      } catch (err) {
-        console.warn('[Storage] Failed to read survey store file, starting fresh', err)
       }
       _store = data
       return _store
@@ -105,16 +102,38 @@ async function getStore(): Promise<StoreData> {
   return _initPromise
 }
 
-async function persistNow() {
-  if (!_store) return
+async function readStoreFile(file: string): Promise<Partial<StoreData> | null> {
+  if (!FileSystem.documentDirectory) return null
   try {
-    if (FileSystem.documentDirectory) {
-      const json = JSON.stringify(_store)
-      await FileSystem.writeAsStringAsync(DB_FILE, json)
-    }
+    if (!(await FileSystem.getInfoAsync(file)).exists) return null
+    const raw = await FileSystem.readAsStringAsync(file)
+    if (!raw || !raw.trim()) return null
+    return JSON.parse(raw) as Partial<StoreData>
   } catch (err) {
-    console.warn('[Storage] Failed to persist survey store file', err)
+    console.warn(`[Storage] ${file} is unreadable; keeping it aside`, err)
+    await FileSystem.copyAsync({ from: file, to: `${file}.corrupt-${Date.now()}.json` }).catch(() => {})
+    return null
   }
+}
+
+let writeChain: Promise<void> = Promise.resolve()
+
+/**
+ * Saves the whole store without ever leaving a half-written file: write a temporary file, keep the current file as the
+ * backup, then move the temporary file into place. Saves run one after another, never interleaved.
+ */
+function persistNow(): Promise<void> {
+  writeChain = writeChain.then(async () => {
+    if (!_store || !FileSystem.documentDirectory) return
+    try {
+      await FileSystem.writeAsStringAsync(DB_TMP, JSON.stringify(_store))
+      if ((await FileSystem.getInfoAsync(DB_FILE)).exists) await FileSystem.copyAsync({ from: DB_FILE, to: DB_BACKUP })
+      await FileSystem.moveAsync({ from: DB_TMP, to: DB_FILE })
+    } catch (err) {
+      console.warn('[Storage] Failed to persist survey store file', err)
+    }
+  })
+  return writeChain
 }
 
 export function db(): Promise<any> {

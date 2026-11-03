@@ -1,20 +1,6 @@
-import * as React from 'react'
 import { useEffect } from 'react'
 import { View } from 'react-native'
 import { Stack, useRouter, useSegments } from 'expo-router'
-
-const _usePolyfill = function (promiseOrContext: any) {
-  if (promiseOrContext && (promiseOrContext.$$typeof || promiseOrContext._context)) {
-    return (React as any).useContext(promiseOrContext)
-  }
-  return null
-}
-if (typeof (React as any).use !== 'function') {
-  ;(React as any).use = _usePolyfill
-}
-if ((React as any).default && typeof (React as any).default.use !== 'function') {
-  ;(React as any).default.use = _usePolyfill
-}
 import { StatusBar } from 'expo-status-bar'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
