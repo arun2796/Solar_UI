@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, errorMessage } from '../../lib/api'
 import type { SurveyDetail } from '../../lib/types'
 import { Button, Field, Modal, Notice, Select, Textarea } from '../../components/ui'
+import { canAssign, PERM } from '../../lib/roles'
 
 interface SurveyReassignModalProps {
   open: boolean
@@ -22,7 +23,8 @@ export function SurveyReassignModal({ open, onClose, survey, onReassigned }: Sur
     queryFn: () => api.engineers.list(true),
     enabled: open,
   })
-  const activeEngineers = engineersQuery.data?.filter(e => e.isActive) ?? []
+  // only people allowed to do site surveys (the current assignee stays listed)
+  const activeEngineers = engineersQuery.data?.filter(e => e.isActive && canAssign(e, PERM.surveysWork, survey.assignedEngineerId || survey.engineerId)) ?? []
 
   const reassignMutation = useMutation({
     mutationFn: () => api.surveys.reassign(survey.id, { engineerId, reason: reason.trim() || null }),

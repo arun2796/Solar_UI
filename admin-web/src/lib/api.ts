@@ -3,7 +3,7 @@ import type { DevUser } from './devAuth'
 import { accessToken, API_URL, logout, refresh, setSession, type AuthResponse } from './session'
 import { queryClient } from './queryClient'
 import { SECTIONS } from './types'
-import type { Appointment, AppointmentUpsert, AppUser, Client, ClientUpsert, Company, DashboardSummary, DefectSummaryItem, Engineer, Me, Paged, Report, ReportFields, ReportListItem, ScheduleItem, ShareLink, SurveyComment, SurveyDetail, SurveyListItem, SurveyReassign, SurveyTaskCreate, UserCreate } from './types'
+import type { Appointment, AppointmentUpsert, AppUser, Client, ClientUpsert, Company, DashboardSummary, DefectSummaryItem, Engineer, FieldRole, Me, Paged, PermissionMatrix, Report, ReportFields, ReportListItem, ScheduleItem, ShareLink, SurveyComment, SurveyDetail, SurveyListItem, SurveyReassign, SurveyTaskCreate, UserCreate, UserPermissions } from './types'
 
 export { API_URL }
 
@@ -101,10 +101,17 @@ export const api = {
   },
   engineers: {
     list: (active?: boolean) => http.get<Engineer[]>('/engineers', { params: q({ active }) }).then(r => r.data),
-    create: (d: { name: string; phone?: string | null; email: string; employeeCode?: string | null; password: string }) => http.post<Engineer>('/engineers', d).then(r => r.data),
-    update: (id: string, d: { name: string; phone?: string | null; employeeCode?: string | null }) => http.put<Engineer>(`/engineers/${id}`, d).then(r => r.data),
+    create: (d: { name: string; phone?: string | null; email: string; employeeCode?: string | null; password: string; role: FieldRole }) => http.post<Engineer>('/engineers', d).then(r => r.data),
+    update: (id: string, d: { name: string; phone?: string | null; employeeCode?: string | null; role: FieldRole }) => http.put<Engineer>(`/engineers/${id}`, d).then(r => r.data),
+    permissions: (id: string) => http.get<UserPermissions>(`/engineers/${id}/permissions`).then(r => r.data),
+    setPermissions: (id: string, overrides: Record<string, boolean>) => http.put<UserPermissions>(`/engineers/${id}/permissions`, { overrides }).then(r => r.data),
     setActive: (id: string, active: boolean) => http.post<Engineer>(`/engineers/${id}/${active ? 'activate' : 'deactivate'}`).then(r => r.data),
     setPassword: (id: string, password: string) => http.post<Engineer>(`/engineers/${id}/password`, { password }).then(r => r.data),
+  },
+  /** What the engineer and site engineer roles may do (admin only). */
+  permissions: {
+    get: () => http.get<PermissionMatrix>('/permissions').then(r => r.data),
+    setRole: (role: FieldRole, permissions: string[]) => http.put<PermissionMatrix>(`/permissions/roles/${role}`, { permissions }).then(r => r.data),
   },
   users: {
     list: () => http.get<AppUser[]>('/users').then(r => r.data),

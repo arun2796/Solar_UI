@@ -6,7 +6,10 @@ export type AmcStatus = 'FREE_YEAR1' | 'AMC' | 'EXPIRED' | 'NONE'
 export const AMC_LABELS: Record<string, string> = { FREE_YEAR1: 'Free 1st year', AMC: 'AMC active', EXPIRED: 'AMC expired', NONE: 'No AMC' }
 export const amcLabel = (s?: string | null) => (s ? AMC_LABELS[s] ?? s : '—')
 
-export type Me = { userId: string; role: 'admin' | 'engineer'; engineerId?: string | null; engineerName?: string | null; email?: string | null }
+export type Me = { userId: string; role: 'admin' | 'engineer' | 'site_engineer' | 'management'; engineerId?: string | null; engineerName?: string | null; email?: string | null; permissions?: string[] }
+
+/** Permission keys (the API's Domain.Permissions); the office sets them per role and per person. */
+export const PERM = { clientsView: 'clients.view', reportsWork: 'reports.work', visitsView: 'visits.view', surveysWork: 'surveys.work', surveysCreate: 'surveys.create' } as const
 
 export type Client = {
   id: string; name: string; contactPerson?: string | null; phone?: string | null; email?: string | null; address?: string | null; siteLocation?: string | null

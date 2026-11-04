@@ -5,13 +5,15 @@ import { useQuery } from '@tanstack/react-query'
 import { api } from '../../../lib/api'
 import { assignedTasksCache, surveyDrafts } from '../../../db'
 import type { AssignedSurveyTask, SurveyDraft } from '../../../lib/surveyTypes'
-import { authStore, currentEngineerName } from '../../../lib/auth'
+import { authStore, currentEngineerName, useCan } from '../../../lib/auth'
+import { PERM } from '../../../lib/types'
 import { syncStore } from '../../../lib/store'
 import { Button, Card, Empty, Screen, StateBadge, Title } from '../../../components/ui'
 import { colors, font, space, touch } from '../../../theme'
 
 export default function SurveyDashboard() {
   const router = useRouter()
+  const canCreate = useCan(PERM.surveysCreate)   // "Start a new survey" (Settings > Roles & permissions)
   const owner = authStore.use(s => s.userId)
   const tick = syncStore.use(s => s.tick)
   const engineer = currentEngineerName()
@@ -114,14 +116,14 @@ export default function SurveyDashboard() {
           tintColor={colors.primary}
         />
       }
-      footer={
+      footer={canCreate ? (
         <View style={{ gap: space.xs }}>
           <Button
             title="☀️  Start New Site Survey"
             onPress={() => router.push('/(app)/surveys/new')}
           />
         </View>
-      }
+      ) : undefined}
     >
       <Title sub={`Survey Engineer: ${engineer}`}>
         {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}

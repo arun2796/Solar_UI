@@ -1,7 +1,9 @@
 // Mirrors backend/Application/Dtos/Dtos.cs (camelCase JSON)
 export type Paged<T> = { items: T[]; page: number; pageSize: number; total: number }
-export type Role = 'admin' | 'engineer' | 'management'
-export type Me = { userId: string; role: Role; engineerId?: string | null; engineerName?: string | null; email?: string | null }
+export type Role = 'admin' | 'engineer' | 'site_engineer' | 'management'
+/** Roles that work in the field; what they may do follows their permissions. */
+export type FieldRole = 'engineer' | 'site_engineer'
+export type Me = { userId: string; role: Role; engineerId?: string | null; engineerName?: string | null; email?: string | null; permissions?: string[] }
 
 export type SurveyStatus = 'assigned' | 'draft' | 'submitted' | 'reviewed' | 'proposal_sent' | 'won' | 'lost'
 export type SurveyVerdict = 'FEASIBLE' | 'CONDITIONAL' | 'NOT_FEASIBLE'
@@ -138,7 +140,13 @@ export type ClientUpsert = Omit<Client, 'id' | 'isActive' | 'createdAt' | 'updat
 export type AppUser = { id: string; name?: string | null; email?: string | null; role: Role; isActive: boolean; hasPassword: boolean; engineerId?: string | null; lastLoginAt?: string | null; createdAt: string }
 export type UserCreate = { name?: string | null; email: string; password: string; role: 'admin' | 'management' }
 
-export type Engineer = { id: string; name: string; phone?: string | null; email: string; employeeCode?: string | null; isActive: boolean; userId?: string | null; hasPassword?: boolean; createdAt: string }
+export type Engineer = { id: string; name: string; phone?: string | null; email: string; employeeCode?: string | null; isActive: boolean; userId?: string | null; hasPassword?: boolean; createdAt: string; role: FieldRole; permissions: string[] }
+
+// ---------------------------------------------------------------- permissions (field roles)
+export type PermissionInfo = { key: string; label: string; description: string }
+export type PermissionMatrix = { catalogue: PermissionInfo[]; roles: { role: FieldRole; label: string; permissions: string[] }[] }
+/** overrides: permission -> true (allowed for this person) or false (denied); missing = follows the role. */
+export type UserPermissions = { engineerId: string; role: FieldRole; roleLabel: string; rolePermissions: string[]; overrides: Record<string, boolean>; effective: string[] }
 
 export type YesNo = 'YES' | 'NO'
 export type GoodDefect = 'GOOD' | 'DEFECT'

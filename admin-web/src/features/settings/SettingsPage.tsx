@@ -1,22 +1,23 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Navigate, NavLink, useParams } from 'react-router-dom'
+import { Link, Navigate, NavLink, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
-import { Building2, Calculator, Camera, ImageIcon, IndianRupee, UserRound, type LucideIcon } from 'lucide-react'
+import { Building2, Calculator, Camera, ImageIcon, IndianRupee, ShieldCheck, UserRound, type LucideIcon } from 'lucide-react'
 import { api, API_URL, errorMessage, problemOf } from '../../lib/api'
 import { isDevSession } from '../../lib/devAuth'
 import { useMe } from '../../lib/useMe'
-import type { Company } from '../../lib/types'
+import type { Company, FieldRole, PermissionMatrix } from '../../lib/types'
 import { cx, fmtDateTime } from '../../lib/format'
 import { isValidPhone, PHONE_MESSAGE } from '../../lib/phone'
 import { Button, ErrorState, Field, Input, Notice, PageHeader, Skeleton, Textarea } from '../../components/ui'
 
 // Settings is split into sections, one per job, each with its own address (/settings/<section>) so links and Back work.
-type SectionId = 'company' | 'logo' | 'account' | 'calculations' | 'tariffs' | 'photos'
+type SectionId = 'company' | 'logo' | 'account' | 'roles' | 'calculations' | 'tariffs' | 'photos'
 const SECTIONS: { id: SectionId; group: string; label: string; desc: string; icon: LucideIcon }[] = [
   { id: 'company', group: 'Company', label: 'Company details', desc: 'Name, address and contacts on every PDF', icon: Building2 },
   { id: 'logo', group: 'Company', label: 'Logo', desc: 'Shown on reports and survey PDFs', icon: ImageIcon },
   { id: 'account', group: 'Account', label: 'My account', desc: 'Your sign-in and password', icon: UserRound },
+  { id: 'roles', group: 'Account', label: 'Roles & permissions', desc: 'What engineers and site engineers may do', icon: ShieldCheck },
   { id: 'calculations', group: 'Site survey', label: 'Calculations', desc: 'Constants for system sizing', icon: Calculator },
   { id: 'tariffs', group: 'Site survey', label: 'Tariffs', desc: '₹ per unit by tariff category', icon: IndianRupee },
   { id: 'photos', group: 'Site survey', label: 'Mandatory photos', desc: 'Required before Submit', icon: Camera },
@@ -49,6 +50,7 @@ export default function SettingsPage() {
         {current.id === 'company' && <CompanySection />}
         {current.id === 'logo' && <LogoSection />}
         {current.id === 'account' && <AccountSection />}
+        {current.id === 'roles' && <RolesSection />}
         {current.id === 'calculations' && <SurveyKeysSection keys={SURVEY_CONSTANTS.map(c => c.key)} title="Survey calculations"
           desc="The survey app and the server size every system with these values. Changes apply to calculations made after saving.">
           {(form, set) => <div className="grid max-w-5xl gap-x-5 gap-y-5 sm:grid-cols-2 xl:grid-cols-3">
@@ -219,6 +221,61 @@ function AccountSection() {
         </Panel>
       </form>}
   </div>
+}
+
+// ---------------------------------------------------------------- roles & permissions
+/** What each field role may do. Per-person exceptions are set on the Engineers page. */
+function RolesSection() {
+  const qc = useQueryClient()
+  const q = useQuery({ queryKey: ['permissions'], queryFn: api.permissions.get })
+  const desc = 'Tick what each role may do in the mobile apps. The API enforces it; admin and management are not affected.'
+  if (q.isLoading) return <Panel title="Roles & permissions" desc={desc}><Skeleton rows={5} /></Panel>
+  if (q.isError) return <Panel title="Roles & permissions" desc={desc}><ErrorState message={errorMessage(q.error)} onRetry={() => q.refetch()} /></Panel>
+  return <RolesForm key={JSON.stringify(q.data!.roles)} data={q.data!} desc={desc} onSaved={d => { qc.setQueryData(['permissions'], d); void qc.invalidateQueries({ queryKey: ['engineers'] }) }} />
+}
+
+function RolesForm({ data, desc, onSaved }: { data: PermissionMatrix; desc: string; onSaved: (d: PermissionMatrix) => void }) {
+  const saved = Object.fromEntries(data.roles.map(r => [r.role, r.permissions])) as Record<FieldRole, string[]>
+  const [form, setForm] = useState(saved)
+  const dirty = data.roles.some(r => [...form[r.role]].sort().join() !== [...saved[r.role]].sort().join())
+  const save = useMutation({
+    mutationFn: async () => {
+      let last = data
+      for (const r of data.roles) if ([...form[r.role]].sort().join() !== [...saved[r.role]].sort().join()) last = await api.permissions.setRole(r.role, form[r.role])
+      return last
+    },
+    onSuccess: onSaved,
+  })
+  const toggle = (role: FieldRole, key: string) => { save.reset(); setForm(f => ({ ...f, [role]: f[role].includes(key) ? f[role].filter(k => k !== key) : [...f[role], key] })) }
+
+  return <form onSubmit={e => { e.preventDefault(); save.mutate() }}>
+    <Panel title="Roles & permissions" desc={desc} footer={<>
+      <span className="text-xs text-slate-500">{dirty ? 'You have unsaved changes' : "Applies to each person's next action in the app"}</span>
+      <div className="flex gap-2">{dirty && <Button variant="ghost" onClick={() => { setForm(saved); save.reset() }}>Discard</Button>}
+        <Button type="submit" loading={save.isPending} disabled={!dirty}>Save changes</Button></div></>}>
+      <div className="space-y-4">
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <caption className="sr-only">Permissions per role</caption>
+            <thead><tr className="border-b border-slate-200">
+              <th scope="col" className="py-3 pr-4 text-left text-xs font-semibold text-slate-500">Action</th>
+              {data.roles.map(r => <th key={r.role} scope="col" className="w-36 px-3 py-3 text-center text-xs font-semibold text-slate-500">{r.label}</th>)}
+            </tr></thead>
+            <tbody>{data.catalogue.map(p => <tr key={p.key} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+              <th scope="row" className="py-2.5 pr-4 text-left font-medium text-slate-800">{p.label}<span className="block max-w-[60ch] text-xs font-normal text-slate-500">{p.description}</span></th>
+              {data.roles.map(r => <td key={r.role} className="px-3 py-1 text-center">
+                <label className="inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-lg transition-colors hover:bg-sky-50">
+                  <input type="checkbox" aria-label={`${r.label}: ${p.label}`} checked={form[r.role].includes(p.key)} onChange={() => toggle(r.role, p.key)} className="h-4 w-4 cursor-pointer accent-sky-700" />
+                </label></td>)}
+            </tr>)}</tbody>
+          </table>
+        </div>
+        <p className="text-xs text-slate-500">To allow or deny an action for one person only, open <Link to="/engineers" className="font-medium text-sky-700 underline-offset-4 hover:underline">Engineers</Link> and use Permissions on their row.</p>
+        {save.isSuccess && !dirty && <Notice tone="success">Saved. The apps follow the new permissions from each person's next action.</Notice>}
+        {save.error && <Notice>{errorMessage(save.error)}</Notice>}
+      </div>
+    </Panel>
+  </form>
 }
 
 // ---------------------------------------------------------------- site survey settings

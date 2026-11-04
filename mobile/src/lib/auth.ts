@@ -13,13 +13,13 @@ import type { Me } from './types'
 /** Developer sign-in for local test builds only. The API serves /dev/* only in Development against a local database. */
 export const DEV_LOGIN_ENABLED = process.env.EXPO_PUBLIC_DEV_LOGIN === 'true'
 
-export type DevUser = { userId: string; role: 'admin' | 'engineer'; email?: string | null; engineerId?: string | null; engineerName?: string | null }
+export type DevUser = { userId: string; role: Me['role']; email?: string | null; engineerId?: string | null; engineerName?: string | null }
 export type AuthResponse = { accessToken: string; accessTokenExpiresAt: string; refreshToken: string; refreshTokenExpiresAt: string; user: Me }
 type Meta = { accessTokenExpiresAt: string; refreshTokenExpiresAt: string; user: Me; dev: boolean }
 type Session = Meta & { accessToken: string; refreshToken: string }
 
-export type AuthState = { status: 'loading' | 'in' | 'out'; dev: boolean; userId: string | null }
-export const authStore = createStore<AuthState>({ status: 'loading', dev: false, userId: null })
+export type AuthState = { status: 'loading' | 'in' | 'out'; dev: boolean; userId: string | null; user?: Me | null }
+export const authStore = createStore<AuthState>({ status: 'loading', dev: false, userId: null, user: null })
 
 /** Id of the signed-in user; drafts are owned by it. */
 export const currentUserId = () => authStore.get().userId
@@ -60,7 +60,7 @@ async function clear() {
 export async function startSession(r: AuthResponse, dev = false) {
   await save(r, dev)
   markActive()
-  authStore.set({ status: 'in', dev, userId: r.user.userId })
+  authStore.set({ status: 'in', dev, userId: r.user.userId, user: r.user })
 }
 
 let inFlight: Promise<string | null> | null = null
@@ -76,6 +76,7 @@ export function refresh(): Promise<string | null> {
     try {
       const r = await axios.post<AuthResponse>(`${config.apiUrl}/auth/refresh`, { refreshToken: s.refreshToken }, { timeout: 20_000 })
       await save(r.data, s.dev)
+      authStore.set({ user: r.data.user })                                           // role and permissions as of now
       return r.data.accessToken
     } catch (e) {
       if (isAxiosError(e) && (e.response?.status === 401 || e.response?.status === 400)) { await signOutLocal(); return null }
@@ -95,7 +96,7 @@ export async function accessToken(): Promise<string | null> {
 
 async function signOutLocal() {
   await clear()
-  authStore.set({ status: 'out', dev: false, userId: null })
+  authStore.set({ status: 'out', dev: false, userId: null, user: null })
 }
 
 /** Signs out this phone (revokes the refresh token at the API when reachable). Local drafts are kept on the device. */
@@ -114,6 +115,22 @@ export function markActive(at = Date.now()) {
   void AsyncStorage.setItem(LAST_ACTIVE, String(at)).catch(() => {})
 }
 
+/** Stores a fresh /me (role or permissions changed by the office) for this session. */
+export async function updateUser(me: Me) {
+  if (!session || session.user.userId !== me.userId) return
+  session = { ...session, user: { ...session.user, ...me } }
+  const { accessToken: _a, refreshToken: _r, ...meta } = session
+  await AsyncStorage.setItem(META, JSON.stringify(meta))
+  authStore.set({ user: session.user })
+}
+
+/**
+ * Whether the signed-in user may do a permission (set by the office in Settings > Roles & permissions).
+ * A session saved before permissions existed has none listed: allow, and let the API decide.
+ */
+export const hasPermission = (user: Me | null | undefined, permission: string) => !user?.permissions || user.permissions.includes(permission)
+export const useCan = (permission: string) => authStore.use(s => hasPermission(s.user, permission))
+
 /**
  * Restores the stored session (works offline) unless the app was idle for longer than IDLE_TIMEOUT_MS;
  * then signs out properly, revoking the refresh token when the API is reachable. Call once from the root layout.
@@ -124,11 +141,11 @@ export function initAuth(): () => void {
     const s = await load()
     const last = Number(await AsyncStorage.getItem(LAST_ACTIVE).catch(() => null))
     if (!alive) return
-    if (!s) { await clear(); authStore.set({ status: 'out', dev: false, userId: null }); return }
+    if (!s) { await clear(); authStore.set({ status: 'out', dev: false, userId: null, user: null }); return }
     session = s
     if (!last || Date.now() - last >= IDLE_TIMEOUT_MS) { await signOut(); return }
     markActive()
-    authStore.set({ status: 'in', dev: s.dev, userId: s.user.userId })
+    authStore.set({ status: 'in', dev: s.dev, userId: s.user.userId, user: s.user })
   })()
   return () => { alive = false }
 }

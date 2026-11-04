@@ -6,6 +6,7 @@ import type { Appointment, AppointmentUpsert } from '../../lib/types'
 import { invalidateAppointments } from '../../lib/invalidate'
 import { fmtDate, today } from '../../lib/format'
 import { Badge, Button, Field, Input, Modal, Notice, Select, Textarea } from '../../components/ui'
+import { canAssign, PERM } from '../../lib/roles'
 
 /** What the dialog starts with: an existing appointment to edit, or defaults for a new one. */
 export type AppointmentDraft = { appointment?: Appointment; clientId?: string; engineerId?: string; date?: string }
@@ -69,7 +70,7 @@ function AppointmentDialog({ draft, onClose }: { draft: AppointmentDraft; onClos
       <Field label="Engineer *">
         <Select value={f.engineerId} onChange={e => set('engineerId', e.target.value)} disabled={engineers.isLoading} aria-label="Engineer">
           <option value="">{engineers.isLoading ? 'Loading engineers…' : '— Choose an engineer —'}</option>
-          {engineers.data?.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}
+          {engineers.data?.filter(x => canAssign(x, PERM.reportsWork, a?.engineerId)).map(x => <option key={x.id} value={x.id}>{x.name}</option>)}
         </Select></Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Date *"><Input type="date" value={f.scheduledDate} min={a ? undefined : today()} onChange={e => set('scheduledDate', e.target.value)} /></Field>

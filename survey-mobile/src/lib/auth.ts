@@ -11,7 +11,7 @@ import type { Me } from './types'
 /** Developer sign-in for local test builds only. The API serves /dev/* only in Development against a local database. */
 export const DEV_LOGIN_ENABLED = process.env.EXPO_PUBLIC_DEV_LOGIN === 'true'
 
-export type DevUser = { userId: string; role: 'admin' | 'engineer'; email?: string | null; engineerId?: string | null; engineerName?: string | null }
+export type DevUser = { userId: string; role: Me['role']; email?: string | null; engineerId?: string | null; engineerName?: string | null }
 export type AuthResponse = { accessToken: string; accessTokenExpiresAt: string; refreshToken: string; refreshTokenExpiresAt: string; user: Me }
 type Meta = { accessTokenExpiresAt: string; refreshTokenExpiresAt: string; user: Me; dev: boolean }
 type Session = Meta & { accessToken: string; refreshToken: string }
@@ -76,6 +76,7 @@ export function refresh(): Promise<string | null> {
     try {
       const r = await axios.post<AuthResponse>(`${config.apiUrl}/auth/refresh`, { refreshToken: s.refreshToken }, { timeout: 20_000 })
       await save(r.data, s.dev)
+      authStore.set({ user: r.data.user })                                           // role and permissions as of now
       return r.data.accessToken
     } catch (e) {
       if (isAxiosError(e) && (e.response?.status === 401 || e.response?.status === 400)) { await signOutLocal(); return null }
@@ -104,6 +105,22 @@ export async function signOut() {
   await signOutLocal()
   if (s) await axios.post(`${config.apiUrl}/auth/logout`, { refreshToken: s.refreshToken }, { timeout: 8000 }).catch(() => { /* offline */ })
 }
+
+/** Stores a fresh /me (role or permissions changed by the office) for this session. */
+export async function updateUser(me: Me) {
+  if (!session || session.user.userId !== me.userId) return
+  session = { ...session, user: { ...session.user, ...me } }
+  const { accessToken: _a, refreshToken: _r, ...meta } = session
+  await secure.set(META, JSON.stringify(meta))
+  authStore.set({ user: session.user })
+}
+
+/**
+ * Whether the signed-in user may do a permission (set by the office in Settings > Roles & permissions).
+ * A session saved before permissions existed has none listed: allow, and let the API decide.
+ */
+export const hasPermission = (user: Me | null | undefined, permission: string) => !user?.permissions || user.permissions.includes(permission)
+export const useCan = (permission: string) => authStore.use(s => hasPermission(s.user, permission))
 
 /** Restores the stored session; call once from the root layout. */
 export function initAuth(): () => void {

@@ -46,7 +46,7 @@ export const api = {
     changePassword: (currentPassword: string, newPassword: string) => http.post('/auth/change-password', { currentPassword, newPassword }).then(() => undefined),
   },
   dev: {
-    users: () => axios.get<DevUser[]>(`${config.apiUrl}/dev/users`, { params: { role: 'engineer' }, timeout: 8000 }).then(r => r.data),
+    users: () => axios.get<DevUser[]>(`${config.apiUrl}/dev/users`, { params: { role: 'engineer,site_engineer' }, timeout: 8000 }).then(r => r.data),
     login: (userId: string) => axios.post<AuthResponse>(`${config.apiUrl}/dev/login`, { userId }, { timeout: 8000 }).then(r => r.data),
   },
   /** All active clients (pages through the API's 100-per-page limit). */

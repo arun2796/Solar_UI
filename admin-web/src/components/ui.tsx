@@ -60,7 +60,7 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
 
 /** Data table. When `onRow` is set, rows are keyboard-operable (Tab to focus, Enter/Space to open). */
 export function Table<T>({ cols, rows, keyOf, onRow, rowLabel }: { cols: { h: string; cell: (r: T) => ReactNode; className?: string }[]; rows: T[]; keyOf: (r: T) => string; onRow?: (r: T) => void; rowLabel?: (r: T) => string }) {
-  return <div className="overflow-x-auto rounded-xl bg-white shadow-card ring-1 ring-slate-900/6"><table className="min-w-full text-sm"><thead className="border-b border-slate-200 bg-slate-50/80 text-left text-xs text-slate-500"><tr>{cols.map((c, i) => <th key={c.h || `c${i}`} scope="col" className={cx('whitespace-nowrap px-4 py-3 font-semibold', c.className)}>{c.h || <span className="sr-only">Actions</span>}</th>)}</tr></thead>
+  return <div className="relative overflow-x-auto rounded-xl bg-white shadow-card ring-1 ring-slate-900/6"><table className="min-w-full text-sm"><thead className="border-b border-slate-200 bg-slate-50/80 text-left text-xs text-slate-500"><tr>{cols.map((c, i) => <th key={c.h || `c${i}`} scope="col" className={cx('whitespace-nowrap px-4 py-3 font-semibold', c.className)}>{c.h || <span className="sr-only">Actions</span>}</th>)}</tr></thead>
     <tbody>{rows.map(r => <tr key={keyOf(r)}
       onClick={onRow ? () => onRow(r) : undefined}
       onKeyDown={onRow ? e => { if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) { e.preventDefault(); onRow(r) } } : undefined}

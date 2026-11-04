@@ -6,13 +6,12 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { KeyRound, Plus, UserCheck, UserX } from 'lucide-react'
 import { api, errorMessage } from '../../lib/api'
-import type { AppUser, Role } from '../../lib/types'
+import type { AppUser } from '../../lib/types'
 import { fmtDate, fmtDateTime } from '../../lib/format'
 import { useMe } from '../../lib/useMe'
 import { Badge, Button, ConfirmDialog, EmptyState, ErrorState, Field, Input, Modal, Notice, PageHeader, Select, Skeleton, Table } from '../../components/ui'
+import { isFieldRole, ROLE_LABEL, ROLE_TONE } from '../../lib/roles'
 
-const ROLE_LABEL: Record<Role, string> = { admin: 'Operations / admin', management: 'Management (MD)', engineer: 'Engineer' }
-const ROLE_TONE: Record<Role, 'blue' | 'amber' | 'slate'> = { admin: 'blue', management: 'amber', engineer: 'slate' }
 
 const createSchema = z.object({
   name: z.string().trim().max(200, 'At most 200 characters').optional().or(z.literal('')).transform(v => (v ? v : null)),
@@ -45,7 +44,7 @@ export default function UsersPage() {
     <PageHeader title="Users" subtitle="Sign-in accounts and their role. Engineers are added on the Engineers page."
       actions={<Button onClick={() => { create.reset(); setCreating(true) }}><Plus className="h-4 w-4" aria-hidden />New user</Button>} />
     <Select aria-label="Role filter" value={roleFilter} onChange={e => setRoleFilter(e.target.value)} className="mb-3 w-56">
-      <option value="">All roles</option><option value="admin">Operations / admin</option><option value="management">Management (MD)</option><option value="engineer">Engineers</option>
+      <option value="">All roles</option><option value="admin">Operations / admin</option><option value="management">Management (MD)</option><option value="engineer">Engineers</option><option value="site_engineer">Site engineers</option>
     </Select>
     {list.isLoading ? <Skeleton /> : list.isError ? <ErrorState message={errorMessage(list.error)} onRetry={() => list.refetch()} /> : rows.length === 0 ? <EmptyState text="No users." /> :
       <Table rows={rows} keyOf={u => u.id} cols={[
@@ -56,7 +55,7 @@ export default function UsersPage() {
         { h: 'Status', cell: u => <Badge tone={u.isActive ? 'green' : 'slate'}>{u.isActive ? 'Active' : 'Inactive'}</Badge> },
         { h: 'Last sign-in', cell: u => fmtDateTime(u.lastLoginAt) },
         { h: 'Since', cell: u => fmtDate(u.createdAt) },
-        { h: '', cell: u => u.role === 'engineer'
+        { h: '', cell: u => isFieldRole(u.role)
           ? <Link to="/engineers" className="text-xs font-medium text-sky-700 hover:underline">Manage on Engineers page</Link>
           : <div className="flex justify-end gap-0.5">
             <Button variant="ghost" className="px-2" onClick={() => { setPw.reset(); setNewPw(''); setPwFor(u) }} aria-label={`Set password for ${label(u)}`} title={u.hasPassword ? 'Reset password' : 'Set password'}><KeyRound className="h-4 w-4" aria-hidden /></Button>

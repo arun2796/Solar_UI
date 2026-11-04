@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, errorMessage } from '../../lib/api'
 import type { SiteType, SurveyTaskCreate } from '../../lib/types'
 import { Button, Field, Input, Modal, Notice, Select, Textarea } from '../../components/ui'
+import { canAssign, PERM } from '../../lib/roles'
 
 interface NewAssignedSurveyModalProps {
   open: boolean
@@ -38,7 +39,8 @@ export function NewAssignedSurveyModal({ open, onClose, onCreated }: NewAssigned
     queryFn: () => api.engineers.list(true),
     enabled: open,
   })
-  const activeEngineers = engineersQuery.data?.filter(e => e.isActive) ?? []
+  // only people allowed to do site surveys (Settings > Roles & permissions, or their own exception)
+  const activeEngineers = engineersQuery.data?.filter(e => e.isActive && canAssign(e, PERM.surveysWork)) ?? []
 
   const resetForm = () => {
     setCustomerType('Commercial')

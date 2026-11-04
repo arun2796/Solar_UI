@@ -4,15 +4,18 @@ import { useFocusEffect, useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../../../lib/api'
 import { drafts, type Draft } from '../../../db'
-import { authStore } from '../../../lib/auth'
+import { authStore, useCan } from '../../../lib/auth'
 import { syncStore } from '../../../lib/store'
-import { fmtDate, type Appointment } from '../../../lib/types'
+import { fmtDate, PERM, type Appointment } from '../../../lib/types'
 import { Button, Card, Empty, Screen, StateBadge, Title } from '../../../components/ui'
 import { colors, font, space } from '../../../theme'
 
 export default function Dashboard() {
   const router = useRouter()
   const owner = authStore.use(s => s.userId); const tick = syncStore.use(s => s.tick)
+  // what the office allows this account (Settings > Roles & permissions); the API enforces the same
+  const canReports = useCan(PERM.reportsWork), canClients = useCan(PERM.clientsView), canVisits = useCan(PERM.visitsView)
+  const canStart = canReports && canClients
   // Server stats refresh when the screen is focused (not after every background sync, which wastes data on weak networks).
   const dash = useQuery({ queryKey: ['dashboard'], queryFn: api.dashboard, staleTime: 60_000 })
   const [local, setLocal] = useState<Draft[]>([])
@@ -26,24 +29,24 @@ export default function Dashboard() {
   const stat = (label: string, value: number | string, onPress?: () => void, tone = colors.text) => <Pressable accessibilityRole="button" onPress={onPress} disabled={!onPress} style={{ flex: 1, minWidth: 140, minHeight: 88, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: space.md }}>
     <Text style={{ color: colors.muted, fontSize: font.small }}>{label}</Text><Text style={{ fontSize: 32, fontWeight: '800', color: tone }}>{value}</Text></Pressable>
 
-  return <Screen footer={<Button title="＋  Start maintenance visit" onPress={() => router.push('/(app)/clients')} />}>
+  return <Screen footer={canStart ? <Button title="＋  Start maintenance visit" onPress={() => router.push('/(app)/clients')} /> : undefined}>
     <Title sub={dash.data ? new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' }) : dash.isError ? 'Offline — showing what is on this phone' : 'Loading server data…'}>Today</Title>
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginBottom: space.lg }}>
-      {stat('My visits today', dash.data ? todayCount : '—', undefined, todayCount ? colors.primary : colors.text)}
+      {canVisits && stat('My visits today', dash.data ? todayCount : '—', undefined, todayCount ? colors.primary : colors.text)}
       {stat('Drafts on phone', open.length, () => router.push('/(app)/drafts'), open.length ? colors.warn : colors.text)}
       {stat('Submitted this month', dash.data?.submittedThisMonth ?? '—', () => router.push('/(app)/history'), colors.good)}
-      {stat('Upcoming (14 d)', dash.data?.upcoming.length ?? '—')}
+      {canVisits && stat('Upcoming (14 d)', dash.data?.upcoming.length ?? '—')}
     </View>
-    <Card><Text style={{ fontWeight: '800', fontSize: font.large, marginBottom: space.sm }}>My visits</Text>
+    {canVisits && <Card><Text style={{ fontWeight: '800', fontSize: font.large, marginBottom: space.sm }}>My visits</Text>
       {!dash.data ? <Empty text={dash.isError ? 'Could not load from the server.' : 'Loading…'} /> : visits.length === 0 ? <Empty text="No visits assigned to you. You can start any client that is not assigned to another engineer." /> :
-        visits.map(v => <VisitRow key={v.id} v={v} todayIso={todayIso} onPress={() => router.push(`/(app)/clients/${v.clientId}`)} />)}</Card>
+        visits.map(v => <VisitRow key={v.id} v={v} todayIso={todayIso} onPress={() => router.push(`/(app)/clients/${v.clientId}`)} />)}</Card>}
     {open.length > 0 && <Card><Text style={{ fontWeight: '800', fontSize: font.large, marginBottom: space.sm }}>Continue a draft</Text>
       {open.slice(0, 3).map(d => <Pressable key={d.localId} accessibilityRole="button" onPress={() => router.push(`/(app)/reports/${d.localId}/review`)} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: space.sm, minHeight: 52, paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#E2E8F0' }}>
         <View style={{ flex: 1 }}><Text style={{ fontSize: font.base, fontWeight: '700' }}>{d.clientName}</Text><Text style={{ color: colors.muted, fontSize: font.small }}>Visit {fmtDate(d.fields.visitDate)}</Text></View><StateBadge state={d.syncState} /></Pressable>)}</Card>}
-    <Card><Text style={{ fontWeight: '800', fontSize: font.large, marginBottom: space.sm }}>Upcoming visits</Text>
+    {canVisits && <Card><Text style={{ fontWeight: '800', fontSize: font.large, marginBottom: space.sm }}>Upcoming visits</Text>
       {!dash.data ? <Empty text={dash.isError ? 'Could not load from the server.' : 'Loading…'} /> : dash.data.upcoming.length === 0 ? <Empty text="No visits due in the next 14 days." /> :
         dash.data.upcoming.map(u => <Pressable key={u.clientId} accessibilityRole="button" onPress={() => router.push(`/(app)/clients/${u.clientId}`)} style={{ minHeight: 52, paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#E2E8F0' }}>
-          <Text style={{ fontSize: font.base, fontWeight: '700' }}>{u.clientName}</Text><Text style={{ color: u.isOverdue ? colors.danger : colors.muted, fontSize: font.small, fontWeight: u.isOverdue ? '700' : '400' }}>{u.isOverdue ? 'OVERDUE · ' : 'Due '}{fmtDate(u.nextDueDate)}{u.siteLocation ? ` · ${u.siteLocation}` : ''}</Text></Pressable>)}</Card>
+          <Text style={{ fontSize: font.base, fontWeight: '700' }}>{u.clientName}</Text><Text style={{ color: u.isOverdue ? colors.danger : colors.muted, fontSize: font.small, fontWeight: u.isOverdue ? '700' : '400' }}>{u.isOverdue ? 'OVERDUE · ' : 'Due '}{fmtDate(u.nextDueDate)}{u.siteLocation ? ` · ${u.siteLocation}` : ''}</Text></Pressable>)}</Card>}
   </Screen>
 }
 
