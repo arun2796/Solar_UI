@@ -1,5 +1,5 @@
-import { useEffect, useState, type ReactNode } from 'react'
-import { Navigate, NavLink, useNavigate, useParams } from 'react-router-dom'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { Navigate, NavLink, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { Building2, Calculator, Camera, ImageIcon, IndianRupee, UserRound, type LucideIcon } from 'lucide-react'
@@ -7,7 +7,7 @@ import { api, API_URL, errorMessage, problemOf } from '../../lib/api'
 import { isDevSession } from '../../lib/devAuth'
 import { useMe } from '../../lib/useMe'
 import type { Company } from '../../lib/types'
-import { cx, fmtDateTime, inputCls } from '../../lib/format'
+import { cx, fmtDateTime } from '../../lib/format'
 import { isValidPhone, PHONE_MESSAGE } from '../../lib/phone'
 import { Button, ErrorState, Field, Input, Notice, PageHeader, Skeleton, Textarea } from '../../components/ui'
 
@@ -21,52 +21,37 @@ const SECTIONS: { id: SectionId; group: string; label: string; desc: string; ico
   { id: 'tariffs', group: 'Site survey', label: 'Tariffs', desc: '₹ per unit by tariff category', icon: IndianRupee },
   { id: 'photos', group: 'Site survey', label: 'Mandatory photos', desc: 'Required before Submit', icon: Camera },
 ]
-const GROUPS = [...new Set(SECTIONS.map(s => s.group))]
 
 export default function SettingsPage() {
   const { section } = useParams<{ section?: string }>()
-  const navigate = useNavigate()
   const current = SECTIONS.find(s => s.id === section)
+  const tabs = useRef<HTMLUListElement>(null)
+  // On phones the tab row scrolls sideways: keep the open section's tab in view (e.g. after a deep link).
+  useEffect(() => { tabs.current?.querySelector('[aria-current="page"]')?.scrollIntoView({ block: 'nearest', inline: 'center' }) }, [section])
   if (!current) return <Navigate to="/settings/company" replace />
 
   return <>
     <PageHeader title="Settings" subtitle="Company details, your account and the site survey rules" />
-    <div className="grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]">
-      {/* Phones and tablets: one dropdown instead of the side menu */}
-      <div className="lg:hidden">
-        {/* label linked by id, not wrapped: a wrapping label would read every option as part of the name */}
-        <label htmlFor="settings-section" className="mb-1.5 block text-[13px] font-medium text-slate-700">Section</label>
-        <select id="settings-section" value={current.id} onChange={e => navigate(`/settings/${e.target.value}`)}
-          className={cx(inputCls, 'min-h-11 w-full')}>
-          {GROUPS.map(g => <optgroup key={g} label={g}>{SECTIONS.filter(s => s.group === g).map(s => <option key={s.id} value={s.id}>{s.label}</option>)}</optgroup>)}
-        </select>
-      </div>
+    {/* One row of tabs (scrolls sideways on phones), grouped by topic: no second sidebar next to the main menu */}
+    <nav aria-label="Settings sections" className="-mx-4 mb-6 border-b border-slate-200 px-4 md:mx-0 md:px-0">
+      <ul ref={tabs} className="-mb-px flex gap-1 overflow-x-auto [scrollbar-width:none]">
+        {SECTIONS.map((s, i) => <li key={s.id} className="flex shrink-0 items-center">
+          {i > 0 && SECTIONS[i - 1].group !== s.group && <span aria-hidden className="mx-2 h-5 w-px bg-slate-200" />}
+          <NavLink to={`/settings/${s.id}`} title={s.desc} className={({ isActive }) => cx(
+            'group flex min-h-11 items-center gap-2 whitespace-nowrap border-b-2 px-3 text-sm transition-colors duration-200 ease-soft focus:outline-none focus-visible:rounded-t-lg focus-visible:bg-sky-50',
+            isActive ? 'border-sky-700 font-semibold text-sky-900' : 'border-transparent font-medium text-slate-500 hover:border-slate-300 hover:text-slate-800')}>
+            {({ isActive }) => <><s.icon className={cx('h-4 w-4 shrink-0', isActive ? 'text-sky-700' : 'text-slate-400 group-hover:text-slate-600')} aria-hidden />{s.label}</>}
+          </NavLink></li>)}
+      </ul>
+    </nav>
 
-      <nav aria-label="Settings sections" className="hidden lg:block">
-        <div className="sticky top-24 space-y-6">
-          {GROUPS.map(g => <div key={g}>
-            <h2 className="mb-2 px-3 text-[11px] font-semibold tracking-wide text-slate-400">{g}</h2>
-            <ul className="space-y-0.5">{SECTIONS.filter(s => s.group === g).map(s => <li key={s.id}>
-              <NavLink to={`/settings/${s.id}`} className={({ isActive }) => cx(
-                'group flex items-start gap-3 rounded-xl px-3 py-2.5 transition-[background-color,box-shadow] duration-200 ease-soft focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-500/25',
-                isActive ? 'bg-white text-sky-900 shadow-card ring-1 ring-slate-900/6' : 'text-slate-700 hover:bg-white/70')}>
-                {({ isActive }) => <>
-                  <span className={cx('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors', isActive ? 'bg-sky-700 text-white' : 'bg-slate-100 text-slate-500 group-hover:bg-white group-hover:text-slate-700')}><s.icon className="h-4 w-4" aria-hidden /></span>
-                  <span className="min-w-0 pt-px"><span className="block text-sm font-semibold">{s.label}</span>
-                    <span className="block text-xs leading-snug text-slate-500">{s.desc}</span></span>
-                </>}
-              </NavLink></li>)}</ul>
-          </div>)}
-        </div>
-      </nav>
-
-      <div className="min-w-0">
+    <div className="min-w-0">
         {current.id === 'company' && <CompanySection />}
         {current.id === 'logo' && <LogoSection />}
         {current.id === 'account' && <AccountSection />}
         {current.id === 'calculations' && <SurveyKeysSection keys={SURVEY_CONSTANTS.map(c => c.key)} title="Survey calculations"
           desc="The survey app and the server size every system with these values. Changes apply to calculations made after saving.">
-          {(form, set) => <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {(form, set) => <div className="grid max-w-5xl gap-x-5 gap-y-5 sm:grid-cols-2 xl:grid-cols-3">
             {SURVEY_CONSTANTS.map(c => <Field key={c.key} label={c.label} hint={c.hint}>
               <Input type="number" inputMode="decimal" step="any" min="0" value={form[c.key] ?? ''} onChange={e => set(c.key, e.target.value)} required />
             </Field>)}
@@ -74,7 +59,7 @@ export default function SettingsPage() {
         </SurveyKeysSection>}
         {current.id === 'tariffs' && <SurveyKeysSection keys={SURVEY_TARIFFS.map(t => t.key)} title="Tariffs"
           desc="Used for the savings estimate when the engineer picks a tariff category and has no rate from the bill.">
-          {(form, set) => <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {(form, set) => <div className="grid max-w-4xl gap-5 sm:grid-cols-2 xl:grid-cols-4">
             {SURVEY_TARIFFS.map(t => <Field key={t.key} label={t.label} hint="₹ per unit">
               <div className="relative"><span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-slate-500" aria-hidden>₹</span>
                 <Input type="number" inputMode="decimal" step="any" min="0" className="pl-7" value={form[t.key] ?? ''} onChange={e => set(t.key, e.target.value)} required /></div>
@@ -85,9 +70,17 @@ export default function SettingsPage() {
           desc="The app and the server refuse Submit until these photos are attached. Choose per site type.">
           {(form, set) => <MandatoryPhotosGrid form={form} set={set} />}
         </SurveyKeysSection>}
-      </div>
     </div>
   </>
+}
+
+/** One group inside a panel: on wide screens the label and help sit left of the fields, like a form sheet. */
+function Group({ title, help, children }: { title: string; help?: string; children: ReactNode }) {
+  const id = `grp-${title.toLowerCase().replace(/\W+/g, '-')}`
+  return <div role="group" aria-labelledby={id} className="grid gap-x-10 gap-y-4 border-t border-slate-100 py-6 first:border-t-0 first:pt-0 last:pb-0 lg:grid-cols-[15rem_minmax(0,1fr)]">
+    <div><h3 id={id} className="text-sm font-semibold text-slate-900">{title}</h3>{help && <p className="mt-1 text-[13px] leading-relaxed text-slate-500">{help}</p>}</div>
+    <div className="min-w-0">{children}</div>
+  </div>
 }
 
 /** One settings panel: title, short explanation, then the content. */
@@ -121,27 +114,35 @@ function CompanySection() {
     <Panel title="Company details" desc={desc} footer={<>
       <span className="text-xs text-slate-500">{isDirty ? 'You have unsaved changes' : `Last updated ${fmtDateTime(q.data!.updatedAt)}`}</span>
       <Button type="submit" loading={save.isPending} disabled={!isDirty}>Save changes</Button></>}>
-      <div className="space-y-6">
-        <fieldset className="grid gap-4 md:grid-cols-2"><legend className="mb-3 text-[13px] font-semibold text-slate-900">Identity</legend>
-          <Field label="Company name *" error={errors.companyName?.message} className="md:col-span-2"><Input {...register('companyName', { validate: v => !!v?.trim() || 'Company name is required' })} /></Field>
-          <Field label="GST number"><Input {...register('gstNumber')} /></Field>
-          <Field label="Website"><Input {...register('website')} placeholder="https://" /></Field>
-        </fieldset>
-        <fieldset className="grid gap-4 md:grid-cols-2"><legend className="mb-3 text-[13px] font-semibold text-slate-900">Address</legend>
-          <Field label="Address line 1"><Input {...register('addressLine1')} /></Field><Field label="Address line 2"><Input {...register('addressLine2')} /></Field>
-          <Field label="City"><Input {...register('city')} /></Field>
-          <div className="grid grid-cols-2 gap-4"><Field label="State"><Input {...register('state')} /></Field><Field label="Pincode"><Input inputMode="numeric" {...register('pincode')} /></Field></div>
-        </fieldset>
-        <fieldset className="grid gap-4 md:grid-cols-2"><legend className="mb-3 text-[13px] font-semibold text-slate-900">Contacts</legend>
-          <Field label="Phone" error={errors.phone?.message}><Input type="tel" placeholder="e.g. 9876543210 or 04412345678" {...register('phone', phoneRule)} /></Field>
-          <Field label="Email" error={errors.email?.message}><Input type="email" {...register('email', emailRule)} /></Field>
-          <Field label="Reminder emails go to" hint="Next-visit and AMC reminders" error={errors.adminAlertEmail?.message} className="md:col-span-2"><Input type="email" {...register('adminAlertEmail', emailRule)} /></Field>
-        </fieldset>
-        <fieldset><legend className="mb-3 text-[13px] font-semibold text-slate-900">PDF footer</legend>
-          <Field label="Footer text" hint="Printed at the bottom of every page"><Textarea {...register('pdfFooterText')} /></Field>
-        </fieldset>
-        {save.isSuccess && !isDirty && <Notice tone="success">Saved. New PDFs use these details.</Notice>}
-        {save.error && <Notice>{errorMessage(save.error)}</Notice>}
+      <div>
+        <Group title="Identity" help="The legal name and registration printed on every report.">
+          <div className="grid max-w-3xl gap-4 md:grid-cols-2">
+            <Field label="Company name *" error={errors.companyName?.message} className="md:col-span-2"><Input {...register('companyName', { validate: v => !!v?.trim() || 'Company name is required' })} /></Field>
+            <Field label="GST number"><Input {...register('gstNumber')} /></Field>
+            <Field label="Website"><Input {...register('website')} placeholder="https://" /></Field>
+          </div>
+        </Group>
+        <Group title="Address" help="Shown in the PDF header under the company name.">
+          <div className="grid max-w-3xl gap-4 md:grid-cols-2">
+            <Field label="Address line 1"><Input {...register('addressLine1')} /></Field><Field label="Address line 2"><Input {...register('addressLine2')} /></Field>
+            <Field label="City"><Input {...register('city')} /></Field>
+            <div className="grid grid-cols-2 gap-4"><Field label="State"><Input {...register('state')} /></Field><Field label="Pincode"><Input inputMode="numeric" {...register('pincode')} /></Field></div>
+          </div>
+        </Group>
+        <Group title="Contacts" help="How clients reach you, and where reminder emails go.">
+          <div className="grid max-w-3xl gap-4 md:grid-cols-2">
+            <Field label="Phone" error={errors.phone?.message}><Input type="tel" placeholder="e.g. 9876543210 or 04412345678" {...register('phone', phoneRule)} /></Field>
+            <Field label="Email" error={errors.email?.message}><Input type="email" {...register('email', emailRule)} /></Field>
+            <Field label="Reminder emails go to" hint="Next-visit and AMC reminders" error={errors.adminAlertEmail?.message} className="md:col-span-2"><Input type="email" {...register('adminAlertEmail', emailRule)} /></Field>
+          </div>
+        </Group>
+        <Group title="PDF footer" help="A short line at the bottom of every page.">
+          <div className="max-w-3xl"><Field label="Footer text" hint="Printed at the bottom of every page"><Textarea {...register('pdfFooterText')} /></Field></div>
+        </Group>
+        <div className="max-w-3xl space-y-3 lg:ml-70">
+          {save.isSuccess && !isDirty && <Notice tone="success" className="mt-4">Saved. New PDFs use these details.</Notice>}
+          {save.error && <Notice className="mt-4">{errorMessage(save.error)}</Notice>}
+        </div>
       </div>
     </Panel>
   </form>
@@ -209,7 +210,7 @@ function AccountSection() {
       : <form onSubmit={change} noValidate>
         <Panel title="Change password" desc="At least 8 characters. Other devices stay signed in until their session ends."
           footer={<><span className="text-xs text-slate-500">You will stay signed in on this browser.</span><Button type="submit" loading={busy}>Change password</Button></>}>
-          <div className="grid max-w-xl gap-4">
+          <div className="grid max-w-md gap-4">
             <Field label="Current password"><Input type="password" value={curPw} onChange={e => setCurPw(e.target.value)} autoComplete="current-password" /></Field>
             <Field label="New password"><Input type="password" value={pw} onChange={e => setPw(e.target.value)} autoComplete="new-password" /></Field>
             <Field label="Repeat the new password"><Input type="password" value={pw2} onChange={e => setPw2(e.target.value)} autoComplete="new-password" /></Field>
