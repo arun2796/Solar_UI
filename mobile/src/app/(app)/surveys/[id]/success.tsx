@@ -26,7 +26,7 @@ export default function SurveySuccess() {
 
   const finish = () => {
     router.dismissAll()
-    router.replace('/(app)/surveys')
+    router.replace('/(app)/site-surveys')
   }
 
   useEffect(() => {

@@ -98,7 +98,7 @@ export default function SurveyFormScreen() {
     await flush()
     setSaved(true)
     scheduleSurveySync(200)
-    router.replace('/(app)/surveys')
+    router.replace('/(app)/site-surveys')
   }
   saveExitRef.current = () => {
     void saveExit()
@@ -136,7 +136,7 @@ export default function SurveyFormScreen() {
 
   if (loading) return <Loading />
   if (!draft || !sections) {
-    return <NotFound text="This survey was not found on this phone." onBack={() => router.replace('/(app)/surveys')} />
+    return <NotFound text="This survey was not found on this phone." onBack={() => router.replace('/(app)/site-surveys')} />
   }
 
   const s0 = sections.section0

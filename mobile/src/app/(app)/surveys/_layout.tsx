@@ -33,7 +33,6 @@ export default function SurveysLayout() {
         contentStyle: { backgroundColor: colors.bg },
       }}
     >
-      <Stack.Screen name="index" options={{ headerTitle: () => <HeaderBrand title="Site Surveys" />, title: 'Site Surveys' }} />
       <Stack.Screen name="new" options={{ headerTitle: () => <HeaderBrand title="New Site Survey" />, title: 'New Site Survey' }} />
       <Stack.Screen name="task/[id]" options={{ headerTitle: () => <HeaderBrand title="Assigned Survey Task" />, title: 'Assigned Survey Task' }} />
       <Stack.Screen name="[id]/index" options={{ title: 'Survey Form' }} />
