@@ -2,7 +2,7 @@ import * as SQLite from 'expo-sqlite'
 import * as FileSystem from 'expo-file-system/legacy'
 import { defaultSurveySections } from '../lib/surveyTypes'
 import type { AssignedSurveyTask, SurveyCalculations, SurveyDraft, SurveyOverrides, SurveyPhotoLocal, SurveySections } from '../lib/surveyTypes'
-import { db } from './index'
+import { db, queuedWrites, serialWrite } from './index'
 export type { SurveyDraft }
 
 /* ------------------------------------------------------------------------------------------------------------------
@@ -93,14 +93,11 @@ const deleteFile = (uri?: string | null) => {
  * All writes run one after another on the single connection, so a read-modify-write (photos list, signatures) can never
  * interleave with another write. Reads wait for the writes already queued, so they see every change made before them.
  */
-let writeTail: Promise<unknown> = Promise.resolve()
 function write<T>(task: (d: SQLite.SQLiteDatabase) => Promise<T>): Promise<T> {
-  const run = writeTail.then(async () => task(await database()))
-  writeTail = run.catch(() => {})
-  return run
+  return serialWrite(async () => task(await database()))   // the queue shared with the maintenance store (./index)
 }
 async function reader(): Promise<SQLite.SQLiteDatabase> {
-  const queued = writeTail
+  const queued = queuedWrites()
   const d = await database()
   await queued
   return d

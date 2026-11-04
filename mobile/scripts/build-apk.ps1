@@ -3,6 +3,8 @@
 #   Test build (developer sign-in on, talks to your PC over Wi-Fi, server address editable in the app):
 #     powershell -File scripts\build-apk.ps1 -Profile test
 #     powershell -File scripts\build-apk.ps1 -Profile test -ApiUrl http://192.168.1.53:5000
+#   Client demo build (test API, but no developer sign-in and no editable server address on screen):
+#     powershell -File scripts\build-apk.ps1 -Profile test -ApiUrl http://192.168.1.53:5000 -NoDevLogin
 #
 #   Production build (HTTPS API only, developer sign-in off, does not depend on this PC):
 #     powershell -File scripts\build-apk.ps1 -Profile production -ApiUrl https://solar-api.example.net -Keystore C:\keys\solar-release.jks -KeyAlias solar
@@ -14,7 +16,8 @@ param(
   [Parameter(Mandatory = $true)][ValidateSet("test", "production")][string]$Profile,
   [string]$ApiUrl,
   [string]$Keystore,
-  [string]$KeyAlias = "solar"
+  [string]$KeyAlias = "solar",
+  [switch]$NoDevLogin
 )
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot          # mobile/
@@ -50,7 +53,7 @@ if ($Profile -eq "production") {
   $env:EXPO_PUBLIC_DEV_LOGIN = "false"
 } else {
   Remove-Item Env:APP_VARIANT -ErrorAction SilentlyContinue
-  $env:EXPO_PUBLIC_DEV_LOGIN = "true"
+  $env:EXPO_PUBLIC_DEV_LOGIN = $(if ($NoDevLogin) { "false" } else { "true" })
 }
 # Explicit values win over every .env file, so a release bundle can never pick up another profile's settings.
 $env:EXPO_PUBLIC_API_URL = $ApiUrl

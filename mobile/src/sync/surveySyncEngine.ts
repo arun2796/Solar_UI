@@ -182,6 +182,10 @@ export async function runSurveySync(): Promise<void> {
         // offline
       }
     } while (queued)
+    // Work still queued (e.g. the network was not fully up right after reconnecting): try again shortly by itself,
+    // instead of waiting for the next app event or a manual Sync.
+    const left = await surveyDrafts.all(owner)
+    if (left.some(d => d.syncState === 'submitting' || (d.syncState === 'local' && d.dirty === 1))) scheduleSurveySync(15_000)
   } finally {
     running = false
   }

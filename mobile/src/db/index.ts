@@ -69,6 +69,20 @@ async function open(): Promise<SQLite.SQLiteDatabase> {
   return d
 }
 
+/**
+ * One queue for every transaction on the shared connection, maintenance and survey stores alike: SQLite refuses a second
+ * transaction on a connection that has one open ("cannot start a transaction within a transaction"), which made the
+ * survey task list fail to save when the client list was cached at the same moment (e.g. right after sign-in).
+ */
+let txTail: Promise<unknown> = Promise.resolve()
+export function serialWrite<T>(task: (d: SQLite.SQLiteDatabase) => Promise<T>): Promise<T> {
+  const run = txTail.then(async () => task(await db()))
+  txTail = run.catch(() => {})
+  return run
+}
+/** Resolves once every write queued so far has finished (reads wait for it to see their effect). */
+export const queuedWrites = () => txTail
+
 const parse = (r: Row): Draft => ({ ...r, fields: JSON.parse(r.fields) as ReportFields })
 const now = () => new Date().toISOString()
 const deleteFile = (uri?: string | null) => { if (!uri) return; try { const f = new File(uri); if (f.exists) f.delete() } catch { /* already gone */ } }
@@ -158,15 +172,15 @@ export const drafts = {
 export const clientsCache = {
   /** Replaces the cache with the full server list (prunes clients that were removed or deactivated). */
   async replaceAll(list: Client[]) {
-    const d = await db(); const t = now()
-    await d.withTransactionAsync(async () => {
+    const t = now()
+    await serialWrite(d => d.withTransactionAsync(async () => {
       await d.runAsync('delete from clients_cache')
       for (const c of list) await d.runAsync('insert or replace into clients_cache (id, json, cachedAt) values (?,?,?)', c.id, JSON.stringify(c), t)
-    })
+    }))
   },
   async put(list: Client[]) {
-    const d = await db(); const t = now()
-    await d.withTransactionAsync(async () => { for (const c of list) await d.runAsync('insert or replace into clients_cache (id, json, cachedAt) values (?,?,?)', c.id, JSON.stringify(c), t) })
+    const t = now()
+    await serialWrite(d => d.withTransactionAsync(async () => { for (const c of list) await d.runAsync('insert or replace into clients_cache (id, json, cachedAt) values (?,?,?)', c.id, JSON.stringify(c), t) }))
   },
   async all(): Promise<Client[]> { const rows = await (await db()).getAllAsync<{ json: string }>('select json from clients_cache'); return rows.map(r => JSON.parse(r.json) as Client).sort((a, b) => a.name.localeCompare(b.name)) },
   async get(id: string): Promise<Client | null> { const r = await (await db()).getFirstAsync<{ json: string }>('select json from clients_cache where id = ?', id); return r ? (JSON.parse(r.json) as Client) : null },
