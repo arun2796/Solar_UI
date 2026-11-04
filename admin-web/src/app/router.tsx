@@ -28,7 +28,7 @@ export const router = createBrowserRouter([
           { path: 'amc', element: <AmcPage /> },
           { path: 'defects', element: <DefectSummaryPage /> },
           { path: 'users', element: <UsersPage /> },
-          { path: 'settings', element: <SettingsPage /> },
+          { path: 'settings/:section?', element: <SettingsPage /> },
         ],
       },
       { path: '*', element: <Navigate to="/" replace /> },

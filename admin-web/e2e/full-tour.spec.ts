@@ -116,17 +116,31 @@ test('admin full tour with screenshots', async ({ page }) => {
     await shot(page, file)
   }
 
-  // ---- settings: logo, change own password (and back)
+  // ---- settings: one section per page (/settings/<section>), then change own password (and back)
   await page.getByRole('link', { name: 'Settings', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible()
-  await page.getByLabel('Current password').fill('not-my-password')
-  await page.getByLabel('New password').fill('Tour-Admin-789')
+  await expect(page).toHaveURL(/\/settings\/company$/)
+  await expect(page.getByLabel('Company name *')).toHaveValue(/\S/, { timeout: 15_000 })
+  await shot(page, 'settings-company')
+  for (const [link, heading, file] of [['Logo', 'Logo', 'settings-logo'], ['Calculations', 'Survey calculations', 'settings-calculations'],
+    ['Tariffs', 'Tariffs', 'settings-tariffs'], ['Mandatory photos', 'Mandatory photos', 'settings-photos']] as const) {
+    await page.getByRole('navigation', { name: 'Settings sections' }).getByRole('link', { name: new RegExp(`^${link}`) }).click()
+    await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible({ timeout: 15_000 })
+    await noErrors(page)
+    await shot(page, file)
+  }
+  await page.getByRole('navigation', { name: 'Settings sections' }).getByRole('link', { name: /^My account/ }).click()
+  await expect(page).toHaveURL(/\/settings\/account$/)
+  const fillPasswords = async (current: string, next: string) => {
+    await page.getByLabel('Current password', { exact: true }).fill(current)
+    await page.getByLabel('New password', { exact: true }).fill(next)
+    await page.getByLabel('Repeat the new password', { exact: true }).fill(next)
+  }
+  await fillPasswords('not-my-password', 'Tour-Admin-789')
   await page.getByRole('button', { name: 'Change password' }).click()
   await expect(page.getByText(/Current password is incorrect/)).toBeVisible({ timeout: 15_000 })
   await shot(page, 'settings-wrong-current-password')
   const changeTo = async (current: string, next: string) => {
-    await page.getByLabel('Current password').fill(current)
-    await page.getByLabel('New password').fill(next)
+    await fillPasswords(current, next)
     const res = page.waitForResponse(r => r.url().endsWith('/auth/change-password') && r.request().method() === 'POST')
     await page.getByRole('button', { name: 'Change password' }).click()
     expect((await res).status()).toBe(204)
