@@ -186,7 +186,7 @@ export default function SurveyDetailPage() {
       )}
 
       {/* Header Banner */}
-      <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-4 rounded-2xl bg-white shadow-card ring-1 ring-slate-900/6 p-6 md:flex-row md:items-center md:justify-between">
         <div className="space-y-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-mono text-xl font-bold text-sky-900">
@@ -278,7 +278,7 @@ export default function SurveyDetailPage() {
 
       {approveMutation.error && <Notice>Approval failed: {errorMessage(approveMutation.error)}</Notice>}
       {s.approvedForProposalAt && (
-        <div className="flex items-start gap-3 rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-emerald-900 shadow-sm" role="status">
+        <div className="flex items-start gap-3 rounded-xl bg-emerald-50 p-4 text-emerald-900 ring-1 ring-inset ring-emerald-200" role="status">
           <BadgeCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" aria-hidden />
           <div>
             <div className="font-bold">Approved for proposal</div>
@@ -291,7 +291,7 @@ export default function SurveyDetailPage() {
 
       {/* Assigned Task Banner */}
       {s.status === 'assigned' && (
-        <div className="rounded-xl border border-sky-300 bg-sky-50 p-4 text-sky-900 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="rounded-xl bg-sky-50 p-4 text-sky-900 ring-1 ring-inset ring-sky-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
             <div className="font-bold flex items-center gap-2 text-sky-950">
               <span className="inline-block h-2.5 w-2.5 rounded-full bg-sky-500 animate-pulse" />
@@ -312,8 +312,8 @@ export default function SurveyDetailPage() {
 
       {/* Top System Sizing & Financial Estimates Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Recommended Capacity</div>
+        <div className="rounded-xl bg-white shadow-card ring-1 ring-slate-900/6 p-5">
+          <div className="text-[13px] font-medium text-slate-500">Recommended Capacity</div>
           <div className="mt-2 text-3xl font-extrabold text-slate-900">
             {calcs.recommendedSystemSizeKw ?? s9.systemSizeKw ?? '—'} <span className="text-lg font-normal">kW</span>
           </div>
@@ -322,16 +322,16 @@ export default function SurveyDetailPage() {
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Est. Monthly Generation</div>
+        <div className="rounded-xl bg-white shadow-card ring-1 ring-slate-900/6 p-5">
+          <div className="text-[13px] font-medium text-slate-500">Est. Monthly Generation</div>
           <div className="mt-2 text-3xl font-extrabold text-sky-700">
             {calcs.unitsGeneratedPerMonth?.toLocaleString('en-IN') ?? s9.monthlyGenerationUnits?.toLocaleString('en-IN') ?? '—'} <span className="text-lg font-normal">Units</span>
           </div>
           <div className="mt-1 text-xs text-slate-500">Based on 4 daily peak sun hours</div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Est. Annual Savings</div>
+        <div className="rounded-xl bg-white shadow-card ring-1 ring-slate-900/6 p-5">
+          <div className="text-[13px] font-medium text-slate-500">Est. Annual Savings</div>
           <div className="mt-2 text-3xl font-extrabold text-emerald-700">
             ₹{calcs.annualSavingsRs?.toLocaleString('en-IN') ?? s9.annualSavingsRs?.toLocaleString('en-IN') ?? '—'}
           </div>
@@ -340,8 +340,8 @@ export default function SurveyDetailPage() {
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Net Free Roof Area</div>
+        <div className="rounded-xl bg-white shadow-card ring-1 ring-slate-900/6 p-5">
+          <div className="text-[13px] font-medium text-slate-500">Net Free Roof Area</div>
           <div className="mt-2 text-3xl font-extrabold text-slate-900">
             {calcs.netFreeAreaSqft?.toLocaleString('en-IN') ?? '—'} <span className="text-lg font-normal">sq.ft</span>
           </div>
@@ -817,7 +817,7 @@ export default function SurveyDetailPage() {
                 value={internalComments}
                 onChange={e => setInternalComments(e.target.value)}
                 rows={3}
-                className="w-full rounded-md border border-slate-300 p-2.5 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                className="w-full rounded-lg border border-slate-200 p-3 text-sm transition-[border-color,box-shadow] duration-200 hover:border-slate-300 focus:border-sky-500 focus:outline-none focus:ring-4 focus:ring-sky-500/15"
                 placeholder="e.g. Approved capacity 25kW; quote prepared with mono PERC modules"
               />
             </div>

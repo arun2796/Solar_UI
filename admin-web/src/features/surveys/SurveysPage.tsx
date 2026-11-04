@@ -100,20 +100,20 @@ export default function SurveysPage() {
 
       {/* Metrics Cards */}
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-          <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Surveys</div>
+        <div className="rounded-xl bg-white shadow-card ring-1 ring-slate-900/6 p-4">
+          <div className="text-[13px] font-medium text-slate-500">Total Surveys</div>
           <div className="mt-1 text-2xl font-bold text-slate-900">{totalCount}</div>
         </div>
-        <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-          <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Submitted / Reviewed</div>
+        <div className="rounded-xl bg-white shadow-card ring-1 ring-slate-900/6 p-4">
+          <div className="text-[13px] font-medium text-slate-500">Submitted / Reviewed</div>
           <div className="mt-1 text-2xl font-bold text-sky-700">{submittedCount}</div>
         </div>
-        <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-          <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Won Proposals</div>
+        <div className="rounded-xl bg-white shadow-card ring-1 ring-slate-900/6 p-4">
+          <div className="text-[13px] font-medium text-slate-500">Won Proposals</div>
           <div className="mt-1 text-2xl font-bold text-emerald-700">{wonCount}</div>
         </div>
-        <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-          <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Surveyed Capacity</div>
+        <div className="rounded-xl bg-white shadow-card ring-1 ring-slate-900/6 p-4">
+          <div className="text-[13px] font-medium text-slate-500">Surveyed Capacity</div>
           <div className="mt-1 text-2xl font-bold text-amber-700">{totalKw > 0 ? `${totalKw.toFixed(1)} kW` : '—'}</div>
         </div>
       </div>
@@ -211,7 +211,7 @@ export default function SurveysPage() {
               },
               {
                 h: 'Site Type',
-                cell: s => <span className="text-xs uppercase tracking-wide text-slate-600 font-medium">{s.siteType.replace('_', ' ')}</span>,
+                cell: s => <span className="text-xs font-medium capitalize text-slate-600">{s.siteType.replace('_', ' ')}</span>,
               },
               {
                 h: 'Assigned to',

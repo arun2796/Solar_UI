@@ -7,7 +7,7 @@ import { api, API_URL, errorMessage, problemOf } from '../../lib/api'
 import { isDevSession } from '../../lib/devAuth'
 import { useMe } from '../../lib/useMe'
 import type { Company } from '../../lib/types'
-import { cx, fmtDateTime } from '../../lib/format'
+import { cx, fmtDateTime, inputCls } from '../../lib/format'
 import { isValidPhone, PHONE_MESSAGE } from '../../lib/phone'
 import { Button, ErrorState, Field, Input, Notice, PageHeader, Skeleton, Textarea } from '../../components/ui'
 
@@ -35,25 +35,25 @@ export default function SettingsPage() {
       {/* Phones and tablets: one dropdown instead of the side menu */}
       <div className="lg:hidden">
         {/* label linked by id, not wrapped: a wrapping label would read every option as part of the name */}
-        <label htmlFor="settings-section" className="mb-1 block text-sm font-medium text-slate-700">Section</label>
+        <label htmlFor="settings-section" className="mb-1.5 block text-[13px] font-medium text-slate-700">Section</label>
         <select id="settings-section" value={current.id} onChange={e => navigate(`/settings/${e.target.value}`)}
-          className="min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200">
+          className={cx(inputCls, 'min-h-11 w-full')}>
           {GROUPS.map(g => <optgroup key={g} label={g}>{SECTIONS.filter(s => s.group === g).map(s => <option key={s.id} value={s.id}>{s.label}</option>)}</optgroup>)}
         </select>
       </div>
 
       <nav aria-label="Settings sections" className="hidden lg:block">
-        <div className="sticky top-20 space-y-5">
+        <div className="sticky top-24 space-y-6">
           {GROUPS.map(g => <div key={g}>
-            <h2 className="mb-1.5 px-3 text-xs font-semibold uppercase tracking-wider text-slate-500">{g}</h2>
+            <h2 className="mb-2 px-3 text-[11px] font-semibold tracking-wide text-slate-400">{g}</h2>
             <ul className="space-y-0.5">{SECTIONS.filter(s => s.group === g).map(s => <li key={s.id}>
               <NavLink to={`/settings/${s.id}`} className={({ isActive }) => cx(
-                'group flex items-start gap-3 rounded-lg px-3 py-2.5 transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500',
-                isActive ? 'bg-sky-50 text-sky-900 ring-1 ring-sky-200' : 'text-slate-700 hover:bg-slate-100')}>
+                'group flex items-start gap-3 rounded-xl px-3 py-2.5 transition-[background-color,box-shadow] duration-200 ease-soft focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-500/25',
+                isActive ? 'bg-white text-sky-900 shadow-card ring-1 ring-slate-900/6' : 'text-slate-700 hover:bg-white/70')}>
                 {({ isActive }) => <>
-                  <s.icon className={cx('mt-0.5 h-4 w-4 shrink-0', isActive ? 'text-sky-700' : 'text-slate-400 group-hover:text-slate-600')} aria-hidden />
-                  <span className="min-w-0"><span className="block text-sm font-medium">{s.label}</span>
-                    <span className="block text-xs text-slate-500">{s.desc}</span></span>
+                  <span className={cx('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors', isActive ? 'bg-sky-700 text-white' : 'bg-slate-100 text-slate-500 group-hover:bg-white group-hover:text-slate-700')}><s.icon className="h-4 w-4" aria-hidden /></span>
+                  <span className="min-w-0 pt-px"><span className="block text-sm font-semibold">{s.label}</span>
+                    <span className="block text-xs leading-snug text-slate-500">{s.desc}</span></span>
                 </>}
               </NavLink></li>)}</ul>
           </div>)}
@@ -92,10 +92,10 @@ export default function SettingsPage() {
 
 /** One settings panel: title, short explanation, then the content. */
 function Panel({ title, desc, children, footer }: { title: string; desc: string; children: ReactNode; footer?: ReactNode }) {
-  return <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
-    <div className="border-b border-slate-200 px-4 py-4 sm:px-5"><h2 className="text-lg font-semibold text-slate-900">{title}</h2><p className="mt-0.5 text-sm text-slate-500">{desc}</p></div>
-    <div className="px-4 py-5 sm:px-5">{children}</div>
-    {footer && <div className="flex flex-wrap items-center justify-between gap-3 rounded-b-lg border-t border-slate-200 bg-slate-50 px-4 py-3 sm:px-5">{footer}</div>}
+  return <section className="overflow-hidden rounded-2xl bg-white shadow-card ring-1 ring-slate-900/6">
+    <div className="border-b border-slate-100 px-5 py-5 sm:px-7"><h2 className="text-lg font-semibold tracking-[-0.01em] text-slate-900">{title}</h2><p className="mt-1 max-w-[65ch] text-sm text-slate-500">{desc}</p></div>
+    <div className="px-5 py-6 sm:px-7">{children}</div>
+    {footer && <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/70 px-5 py-3.5 sm:px-7">{footer}</div>}
   </section>
 }
 
@@ -122,22 +122,22 @@ function CompanySection() {
       <span className="text-xs text-slate-500">{isDirty ? 'You have unsaved changes' : `Last updated ${fmtDateTime(q.data!.updatedAt)}`}</span>
       <Button type="submit" loading={save.isPending} disabled={!isDirty}>Save changes</Button></>}>
       <div className="space-y-6">
-        <fieldset className="grid gap-4 md:grid-cols-2"><legend className="mb-2 text-sm font-semibold text-slate-800">Identity</legend>
+        <fieldset className="grid gap-4 md:grid-cols-2"><legend className="mb-3 text-[13px] font-semibold text-slate-900">Identity</legend>
           <Field label="Company name *" error={errors.companyName?.message} className="md:col-span-2"><Input {...register('companyName', { validate: v => !!v?.trim() || 'Company name is required' })} /></Field>
           <Field label="GST number"><Input {...register('gstNumber')} /></Field>
           <Field label="Website"><Input {...register('website')} placeholder="https://" /></Field>
         </fieldset>
-        <fieldset className="grid gap-4 md:grid-cols-2"><legend className="mb-2 text-sm font-semibold text-slate-800">Address</legend>
+        <fieldset className="grid gap-4 md:grid-cols-2"><legend className="mb-3 text-[13px] font-semibold text-slate-900">Address</legend>
           <Field label="Address line 1"><Input {...register('addressLine1')} /></Field><Field label="Address line 2"><Input {...register('addressLine2')} /></Field>
           <Field label="City"><Input {...register('city')} /></Field>
           <div className="grid grid-cols-2 gap-4"><Field label="State"><Input {...register('state')} /></Field><Field label="Pincode"><Input inputMode="numeric" {...register('pincode')} /></Field></div>
         </fieldset>
-        <fieldset className="grid gap-4 md:grid-cols-2"><legend className="mb-2 text-sm font-semibold text-slate-800">Contacts</legend>
+        <fieldset className="grid gap-4 md:grid-cols-2"><legend className="mb-3 text-[13px] font-semibold text-slate-900">Contacts</legend>
           <Field label="Phone" error={errors.phone?.message}><Input type="tel" placeholder="e.g. 9876543210 or 04412345678" {...register('phone', phoneRule)} /></Field>
           <Field label="Email" error={errors.email?.message}><Input type="email" {...register('email', emailRule)} /></Field>
           <Field label="Reminder emails go to" hint="Next-visit and AMC reminders" error={errors.adminAlertEmail?.message} className="md:col-span-2"><Input type="email" {...register('adminAlertEmail', emailRule)} /></Field>
         </fieldset>
-        <fieldset><legend className="mb-2 text-sm font-semibold text-slate-800">PDF footer</legend>
+        <fieldset><legend className="mb-3 text-[13px] font-semibold text-slate-900">PDF footer</legend>
           <Field label="Footer text" hint="Printed at the bottom of every page"><Textarea {...register('pdfFooterText')} /></Field>
         </fieldset>
         {save.isSuccess && !isDirty && <Notice tone="success">Saved. New PDFs use these details.</Notice>}
@@ -165,12 +165,12 @@ function LogoSection() {
   }
   return <Panel title="Logo" desc="Shown at the top of every maintenance report and survey PDF.">
     {q.isLoading ? <Skeleton rows={3} /> : <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-      <div className="flex h-32 w-full shrink-0 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 sm:w-64">
+      <div className="flex h-36 w-full shrink-0 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-[repeating-conic-gradient(var(--color-slate-50)_0%_25%,white_0%_50%)] bg-size-[16px_16px] p-4 sm:w-72">
         {q.data?.logoUrl ? <img src={new URL(q.data.logoUrl, API_URL).toString()} alt="Current company logo" className="max-h-full max-w-full object-contain" />
           : <span className="text-sm text-slate-500">No logo uploaded</span>}
       </div>
       <div className="space-y-2">
-        <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-md bg-sky-700 px-4 text-sm font-medium text-white transition-colors hover:bg-sky-800 focus-within:ring-2 focus-within:ring-sky-400">
+        <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg bg-sky-700 px-4 text-sm font-semibold text-white shadow-button transition-[background-color,transform] duration-200 ease-soft hover:bg-sky-800 active:scale-[0.98] focus-within:ring-4 focus-within:ring-sky-500/25">
           <ImageIcon className="h-4 w-4" aria-hidden />{logo.isPending ? 'Uploading…' : q.data?.logoUrl ? 'Replace logo' : 'Upload logo'}
           <input type="file" accept="image/png,image/jpeg" onChange={pick} disabled={logo.isPending} className="sr-only" /></label>
         <p className="text-xs text-slate-500">PNG or JPEG, up to 1 MB. A wide logo on a white background works best.</p>
@@ -201,8 +201,8 @@ function AccountSection() {
   return <div className="space-y-6">
     <Panel title="My account" desc="The account you are signed in with.">
       <dl className="grid gap-4 sm:grid-cols-2">
-        <div><dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Email</dt><dd className="mt-1 text-sm font-medium text-slate-900">{me.data?.email ?? '—'}</dd></div>
-        <div><dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Role</dt><dd className="mt-1 text-sm font-medium capitalize text-slate-900">{me.data?.role ?? '—'}</dd></div>
+        <div><dt className="text-xs font-medium text-slate-500">Email</dt><dd className="mt-1 text-sm font-medium text-slate-900">{me.data?.email ?? '—'}</dd></div>
+        <div><dt className="text-xs font-medium text-slate-500">Role</dt><dd className="mt-1 text-sm font-medium capitalize text-slate-900">{me.data?.role ?? '—'}</dd></div>
       </dl>
     </Panel>
     {isDev ? <Notice tone="info">You are signed in with the developer login, which has no password. Sign in with email and password to change one.</Notice>
@@ -272,8 +272,8 @@ function MandatoryPhotosGrid({ form, set }: { form: Record<string, string>; set:
     <table className="min-w-full text-sm">
       <caption className="sr-only">Mandatory photos per site type</caption>
       <thead><tr className="border-b border-slate-200">
-        <th scope="col" className="py-2 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Site type</th>
-        {PHOTO_TAGS.map(([, l]) => <th key={l} scope="col" className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">{l}</th>)}
+        <th scope="col" className="py-3 pr-4 text-left text-xs font-semibold text-slate-500">Site type</th>
+        {PHOTO_TAGS.map(([, l]) => <th key={l} scope="col" className="px-3 py-3 text-center text-xs font-semibold text-slate-500">{l}</th>)}
       </tr></thead>
       <tbody>{SITE_TYPES.map(([type, label]) => {
         const key = `mandatory_photos_${type}`
@@ -283,7 +283,7 @@ function MandatoryPhotosGrid({ form, set }: { form: Record<string, string>; set:
           <th scope="row" className="py-1 pr-4 text-left font-medium text-slate-800">{label}<span className="block text-xs font-normal text-slate-500">{tags.length} required</span></th>
           {PHOTO_TAGS.map(([tag, l]) => <td key={tag} className="px-3 py-1 text-center">
             {/* the whole cell is the touch target (44 px), not just the 16 px box */}
-            <label className="inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-md hover:bg-sky-50">
+            <label className="inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-lg transition-colors hover:bg-sky-50">
               <input type="checkbox" aria-label={`${label}: ${l}`} checked={tags.includes(tag)} onChange={() => toggle(tag)} className="h-4 w-4 cursor-pointer accent-sky-700" />
             </label>
           </td>)}

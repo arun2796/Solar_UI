@@ -1,4 +1,51 @@
+@import "@fontsource-variable/plus-jakarta-sans";
 @import "tailwindcss";
 
+/*
+ * Design tokens. The pages use the `sky` and `slate` utility names, so the brand palette is defined here once:
+ * `sky` is the Shree Abhi navy (from the logo), calm and below 80% saturation; `slate` stays the one cool grey family.
+ */
+@theme {
+  --font-sans: "Plus Jakarta Sans Variable", ui-sans-serif, system-ui, sans-serif;
+
+  --color-sky-50: #f3f6fb;
+  --color-sky-100: #e4ebf6;
+  --color-sky-200: #cbd8ee;
+  --color-sky-300: #a3bbe0;
+  --color-sky-400: #7194cb;
+  --color-sky-500: #4d74b4;
+  --color-sky-600: #355c9c;
+  --color-sky-700: #2a4a82;
+  --color-sky-800: #233d6b;
+  --color-sky-900: #1f3459;
+  --color-sky-950: #14213a;
+
+  --color-canvas: #f5f7fa;
+
+  /* soft, navy-tinted layered shadows (one light source, from above) */
+  --shadow-card: 0 1px 2px rgb(20 33 58 / 0.04), 0 8px 24px -12px rgb(20 33 58 / 0.12);
+  --shadow-lift: 0 2px 4px rgb(20 33 58 / 0.05), 0 16px 32px -16px rgb(20 33 58 / 0.22);
+  --shadow-pop: 0 4px 8px rgb(20 33 58 / 0.06), 0 24px 48px -12px rgb(20 33 58 / 0.28);
+  --shadow-button: 0 1px 2px rgb(20 33 58 / 0.12), inset 0 1px 0 rgb(255 255 255 / 0.12);
+
+  --ease-soft: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 :root { color-scheme: light; }
-body { @apply bg-slate-50 text-slate-900 antialiased; }
+html { scroll-behavior: smooth; }
+body {
+  @apply bg-canvas text-slate-900 antialiased;
+  font-feature-settings: "cv11", "ss01";
+}
+h1, h2, h3 { text-wrap: balance; }
+p { text-wrap: pretty; }
+
+/* thinner, precise icon strokes everywhere (lucide-react adds the `lucide` class) */
+.lucide { stroke-width: 1.75; }
+
+/* numbers line up in tables and figures */
+table, .tabular-nums { font-variant-numeric: tabular-nums; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}

@@ -35,7 +35,7 @@ export default function UpcomingOverduePage() {
   return <>
     <PageHeader title="Upcoming and overdue visits" actions={q.data && q.data.length > 0 && <Button variant="secondary" onClick={() => csv(q.data!)}><Download className="h-4 w-4" aria-hidden />CSV</Button>} />
     <div className="mb-3 flex flex-wrap items-center gap-2">
-      <div role="tablist" aria-label="Visit list" className="flex gap-1 rounded-md bg-slate-100 p-1 text-sm">{(['upcoming', 'overdue'] as const).map(v => <button key={v} type="button" role="tab" aria-selected={tab === v} onClick={() => setTab(v)} className={cx('rounded px-3 py-1.5', tab === v ? 'bg-white font-medium shadow-sm' : 'text-slate-600')}>{v === 'upcoming' ? `Upcoming (${days} days)` : 'Overdue'}</button>)}</div>
+      <div role="tablist" aria-label="Visit list" className="flex gap-1 rounded-lg bg-slate-200/60 p-1 text-sm">{(['upcoming', 'overdue'] as const).map(v => <button key={v} type="button" role="tab" aria-selected={tab === v} onClick={() => setTab(v)} className={cx('rounded px-3 py-1.5', tab === v ? 'bg-white font-medium shadow-sm' : 'text-slate-600')}>{v === 'upcoming' ? `Upcoming (${days} days)` : 'Overdue'}</button>)}</div>
       {tab === 'upcoming' && <Select aria-label="Upcoming window" value={days} onChange={e => setSp({ days: e.target.value })} className="w-36">{WINDOWS.map(w => <option key={w} value={w}>Next {w} days</option>)}</Select>}
     </div>
     {q.isLoading ? <Skeleton /> : q.isError ? <ErrorState message={errorMessage(q.error)} onRetry={() => q.refetch()} /> : !q.data?.length ? <EmptyState text={tab === 'overdue' ? 'No overdue visits. 🎉' : `No visits due in the next ${days} days.`} /> :

@@ -33,14 +33,14 @@ export default function DashboardPage() {
       <Button onClick={() => nav('/calendar')}><CalendarPlus className="h-4 w-4" aria-hidden />Assign a visit</Button></>} />
 
     {summary.isLoading ? <Skeleton rows={2} /> : summary.isError ? <ErrorState message={errorMessage(summary.error)} onRetry={() => summary.refetch()} /> : <>
-      <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">{month} at a glance</h2>
+      <h2 className="mb-3 text-[13px] font-semibold text-slate-600">{month} at a glance</h2>
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <StatCard label="Visits this month" value={s!.visitsThisMonth} icon={ClipboardList} hint="Open reports →" onClick={() => nav(`/reports?from=${monthStart}&to=${t}`)} />
         <StatCard label="Submitted reports" value={s!.submittedReports} tone="ok" icon={CheckCircle2} hint="All submitted →" onClick={() => nav('/reports')} />
         <StatCard label="Pending drafts" value={s!.pendingDrafts} tone={s!.pendingDrafts ? 'warn' : 'default'} icon={FilePenLine} hint="Not yet submitted →" onClick={() => nav('/reports?status=draft')} />
         <StatCard label="Defects this month" value={s!.defectsIdentified} tone={s!.defectsIdentified ? 'danger' : 'default'} icon={Wrench} hint="Defect summary →" onClick={() => nav(`/defects?from=${monthStart}&to=${t}`)} />
       </div>
-      <h2 className="mb-2 mt-6 text-xs font-semibold uppercase tracking-wider text-slate-500">Needs attention</h2>
+      <h2 className="mb-3 mt-8 text-[13px] font-semibold text-slate-600">Needs attention</h2>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <StatCard label="Due in the next 14 days" value={s!.upcomingVisits} icon={CalendarClock} hint="Upcoming visits →" onClick={() => nav('/schedule?days=14')} />
         <StatCard label="Overdue visits" value={s!.overdueVisits} tone={s!.overdueVisits ? 'danger' : 'ok'} icon={AlertTriangle} hint={s!.overdueVisits ? 'Plan these first →' : 'Nothing overdue'} onClick={() => nav('/schedule?tab=overdue')} />
@@ -67,7 +67,7 @@ export default function DashboardPage() {
               <span className="min-w-0 flex-1"><span className="block truncate font-medium text-slate-900">{r.clientName}</span>
                 <span className="block truncate text-xs text-slate-500">{r.siteLocation ?? 'No site location'} · due {fmtDate(r.nextDueDate)}</span></span>
               <Badge tone={amcTone(r.amcStatus)}>{r.amcStatus}</Badge>
-              <span className={cx('shrink-0 rounded-full px-2 py-0.5 text-xs font-medium', due.cls)}>{due.text}</span></button></li> })}</ul>}
+              <span className={cx('shrink-0 rounded-md px-2 py-0.5 text-xs font-medium', due.cls)}>{due.text}</span></button></li> })}</ul>}
       </Card>
     </div>
 

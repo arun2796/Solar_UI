@@ -2,7 +2,7 @@
 
 export const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(' ')
 
-export const inputCls = 'w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200 disabled:bg-slate-100'
+export const inputCls = 'min-h-10 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-[0_1px_1px_rgb(20_33_58/0.04)] transition-[border-color,box-shadow] duration-200 ease-soft placeholder:text-slate-400 hover:border-slate-300 focus:border-sky-500 focus:outline-none focus:ring-4 focus:ring-sky-500/15 disabled:bg-slate-50 disabled:text-slate-500'
 
 const pad = (n: number) => String(n).padStart(2, '0')
 
