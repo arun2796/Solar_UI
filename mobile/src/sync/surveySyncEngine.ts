@@ -1,5 +1,6 @@
 import { api, errorMessage, isNetworkError, statusOf } from '../lib/api'
-import { currentUserId } from '../lib/auth'
+import { authStore, currentUserId, hasPermission } from '../lib/auth'
+import { PERM } from '../lib/types'
 import { surveyDrafts, surveysCache } from '../db'
 import { shadowFreeSunHours, tariffRate } from '../lib/surveyCalculator'
 import { currentSurveySettings, refreshSurveySettings } from '../lib/surveySettings'
@@ -158,6 +159,7 @@ export async function runSurveySync(): Promise<void> {
   }
   const owner = currentUserId()
   if (!owner) return
+  if (!hasPermission(authStore.get().user, PERM.surveysWork)) return   // site surveys are not switched on for this account
 
   running = true
   try {

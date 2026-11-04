@@ -8,18 +8,19 @@ import { Button, Card, Screen, Title } from '../../components/ui'
 import { colors, font, space } from '../../theme'
 
 /**
- * Signed-in area: the bottom tabs, plus client selection and the report screens as stack screens on top of them.
+ * Signed-in area: the bottom tabs, plus client selection, the report screens and the survey screens as stack screens on top of them.
  * (In this Expo Router version a tab with `href: null` becomes a hidden route that redirects away, so these
  * screens must not be hidden tabs.)
  */
 export default function AppLayout() {
   useFreshPermissions()
-  const canReports = useCan(PERM.reportsWork), canVisits = useCan(PERM.visitsView)
-  if (!canReports && !canVisits) return <NoAccess text="Your account cannot use the maintenance app: it has neither maintenance reports nor assigned visits switched on." />
+  const canReports = useCan(PERM.reportsWork), canVisits = useCan(PERM.visitsView), canSurveys = useCan(PERM.surveysWork)
+  if (!canReports && !canVisits && !canSurveys) return <NoAccess text="Your account has no work switched on in this app: no maintenance reports, assigned visits or site surveys." />
   return <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
     <Stack.Screen name="(tabs)" />
     <Stack.Screen name="clients" />
     <Stack.Screen name="reports" />
+    <Stack.Screen name="surveys" />
   </Stack>
 }
 

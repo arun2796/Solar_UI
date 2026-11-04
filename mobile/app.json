@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "Solar Maintenance",
+    "name": "Shree Abhi Solar",
     "slug": "solar-maintenance",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "solarpmc",
@@ -20,7 +20,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.shreeabhi.solarmaintenance"
+      "package": "com.shreeabhi.solarmaintenance",
+      "versionCode": 2
     },
     "web": {
       "output": "static",

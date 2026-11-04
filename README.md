@@ -8,4 +8,4 @@ They need the API from the companion repository **[Solar_Api](https://github.com
 | Folder | Contents |
 |---|---|
 | `admin-web/` | React + TypeScript + Vite admin website for the office. See [admin-web/README.md](admin-web/README.md) |
-| `mobile/` | React Native + Expo Android app for field engineers. See [mobile/README.md](mobile/README.md) |
+| `mobile/` | React Native + Expo Android app "Shree Abhi Solar" for field staff: maintenance visits/reports and site surveys in one app, shown by role and permissions. See [mobile/README.md](mobile/README.md) |

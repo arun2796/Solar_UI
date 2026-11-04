@@ -17,7 +17,7 @@ export default function Splash() {
         accessibilityLabel="Shree Abhi Electricals & Engineering Pvt. Ltd."
       />
     </View>
-    <Text style={{ fontSize: 26, fontWeight: '800', color: '#fff', textAlign: 'center' }}>Solar Maintenance</Text>
+    <Text style={{ fontSize: 26, fontWeight: '800', color: '#fff', textAlign: 'center' }}>Shree Abhi Solar</Text>
     <Text style={{ color: '#E0F2FE', fontSize: 14, textAlign: 'center' }}>Shree Abhi Electricals & Engineering Pvt. Ltd.</Text>
     <ActivityIndicator color="#fff" style={{ marginTop: 8 }} />
   </View>

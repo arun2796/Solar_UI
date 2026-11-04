@@ -1,11 +1,12 @@
 import NetInfo from '@react-native-community/netinfo'
 import { AppState } from 'react-native'
 import { api, errorMessage, isNetworkError, problemOf, statusOf } from '../lib/api'
-import { currentUserId } from '../lib/auth'
+import { authStore, currentUserId, hasPermission } from '../lib/auth'
 import { syncStore } from '../lib/store'
-import { FIELD_LABELS, type Report, type ReportFields } from '../lib/types'
+import { FIELD_LABELS, PERM, type Report, type ReportFields } from '../lib/types'
 import { draftProblems } from '../forms/schema'
 import { clientsCache, drafts, meta, type Draft } from '../db'
+import { runSurveySync } from './surveySyncEngine'
 
 /**
  * Sync engine. Per draft, in creation order: create (POST, idempotent on localId) → update fields (PUT with version)
@@ -29,21 +30,24 @@ export function startSyncEngine() {
     // isInternetReachable is null while unknown (e.g. at start-up): only an explicit false means offline.
     const online = s.isConnected !== false && s.isInternetReachable !== false
     syncStore.set({ net: online ? 'online' : 'offline' })
-    if (online) void runSync()
+    if (online) syncAll()
   })
-  const sub = AppState.addEventListener('change', st => { if (st === 'active') void runSync() })
+  const sub = AppState.addEventListener('change', st => { if (st === 'active') syncAll() })
   const owner = currentUserId()
-  void (owner ? drafts.claimOrphans(owner) : Promise.resolve()).then(() => runSync())
+  void (owner ? drafts.claimOrphans(owner) : Promise.resolve()).then(syncAll)
   return () => { unsubNet(); sub.remove(); if (timer) { clearTimeout(timer); timer = null } }
 }
 
-export function scheduleSync(ms = 1500) { if (timer) clearTimeout(timer); timer = setTimeout(() => { timer = null; void runSync() }, Math.max(0, ms)) }
+/** Maintenance reports and site surveys sync independently; each skips what the account may not do. */
+function syncAll() { void runSync(); void runSurveySync() }
+
+export function scheduleSync(ms = 1500) { if (timer) clearTimeout(timer); timer = setTimeout(() => { timer = null; syncAll() }, Math.max(0, ms)) }
 
 /** User-initiated sync: failed drafts are re-queued, backoff is reset, and the offline flag is ignored (NetInfo can be wrong). */
 export async function syncNow(): Promise<void> {
   const owner = currentUserId(); if (!owner) return
   await drafts.retryNow(owner)
-  await runSync({ manual: true })
+  await Promise.all([runSync({ manual: true }), runSurveySync()])
 }
 
 export async function runSync(opts: { manual?: boolean } = {}): Promise<void> {
@@ -73,6 +77,7 @@ export async function runSync(opts: { manual?: boolean } = {}): Promise<void> {
 }
 
 async function refreshClients(force: boolean) {
+  if (!hasPermission(authStore.get().user, PERM.clientsView)) return
   try {
     const last = Number(await meta.get('clientsCachedAt') ?? 0)
     if (!force && Date.now() - last < CLIENTS_REFRESH_MS) return

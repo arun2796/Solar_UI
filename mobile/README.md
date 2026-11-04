@@ -1,6 +1,14 @@
-# Solar Maintenance — Engineer Mobile App (Expo)
+# Shree Abhi Solar — Engineer Mobile App (Expo)
 
-Expo SDK 58, Expo Router, TypeScript, React Hook Form + Zod, expo-sqlite (drafts and offline cache), react-native-signature-canvas, @react-native-community/datetimepicker, expo-sharing.
+One app for maintenance visits/reports **and** site surveys. What a person sees follows their role and permissions, set by the
+office in the admin website (Settings > Roles & permissions, and per person on the Engineers page): **Home** (maintenance) and
+**Surveys** tabs appear only when allowed; Drafts and History switch between maintenance and surveys for people who do both.
+The API enforces the same permissions. Android package `com.shreeabhi.solarmaintenance` (installs over the old maintenance app;
+report drafts and surveys share `solar-maintenance.db`).
+
+Expo SDK 58, Expo Router, TypeScript, React Hook Form + Zod, expo-sqlite (drafts and offline cache), react-native-signature-canvas, @react-native-community/datetimepicker, expo-sharing, expo-image-picker / expo-image-manipulator / expo-location (survey photos with time and GPS).
+
+Tests: `npm test` (survey calculator, same hand-calculated sites as the API's `SurveyCalculatorTests`).
 
 ## Run locally
 ```
@@ -14,7 +22,7 @@ Test builds also let you change the server address on the login screen (Quick si
 `react-native-signature-canvas` (WebView) and `expo-sqlite` need native code, so use a **development build** or a test APK rather than Expo Go.
 
 Sign-in goes to the API (`POST /auth/login`). Tokens are stored in the encrypted SecureStore and refreshed automatically; if the
-phone is offline the session is kept and drafts keep saving. Only `engineer` users can create reports.
+phone is offline the session is kept and drafts keep saving. Engineers and site engineers sign in here; what they can create depends on their permissions.
 Forgotten password: an administrator sets a new one on the admin site (Engineers → Reset password).
 
 **Environment files** (every `EXPO_PUBLIC_` value is public — it is inside the APK; never put secrets here):

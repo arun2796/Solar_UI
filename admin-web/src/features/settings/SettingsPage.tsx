@@ -52,7 +52,7 @@ export default function SettingsPage() {
         {current.id === 'account' && <AccountSection />}
         {current.id === 'roles' && <RolesSection />}
         {current.id === 'calculations' && <SurveyKeysSection keys={SURVEY_CONSTANTS.map(c => c.key)} title="Survey calculations"
-          desc="The survey app and the server size every system with these values. Changes apply to calculations made after saving.">
+          desc="The mobile app and the server size every system with these values. Changes apply to calculations made after saving.">
           {(form, set) => <div className="grid max-w-5xl gap-x-5 gap-y-5 sm:grid-cols-2 xl:grid-cols-3">
             {SURVEY_CONSTANTS.map(c => <Field key={c.key} label={c.label} hint={c.hint}>
               <Input type="number" inputMode="decimal" step="any" min="0" value={form[c.key] ?? ''} onChange={e => set(c.key, e.target.value)} required />
@@ -279,7 +279,7 @@ function RolesForm({ data, desc, onSaved }: { data: PermissionMatrix; desc: stri
 }
 
 // ---------------------------------------------------------------- site survey settings
-// Same keys as the API (SurveySettingsService); the survey app reads them for its calculations and Submit checks.
+// Same keys as the API (SurveySettingsService); the mobile app reads them for its calculations and Submit checks.
 const SURVEY_CONSTANTS = [
   { key: 'generation_per_kw_per_day', label: 'Generation per kW per day (units)', hint: 'Default 4' },
   { key: 'area_per_kw_sqft', label: 'Roof area per kW (sq.ft)', hint: 'Default 50' },
@@ -318,7 +318,7 @@ function SurveyKeysSection({ keys, title, desc, children }: {
         <Button type="submit" loading={save.isPending} disabled={!dirty}>Save changes</Button></div></>}>
       <div className="space-y-4">
         {children(values, set)}
-        {save.isSuccess && <Notice tone="success">Saved. The survey app picks up the new values on its next sync.</Notice>}
+        {save.isSuccess && <Notice tone="success">Saved. The mobile app picks up the new values on its next sync.</Notice>}
         {save.error && <Notice>{Object.values(problemOf(save.error).errors ?? {}).flat().join(' ') || errorMessage(save.error)}</Notice>}
       </div>
     </Panel>

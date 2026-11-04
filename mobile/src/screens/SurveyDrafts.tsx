@@ -1,15 +1,15 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useState, type ReactNode } from 'react'
 import { Alert, FlatList, Pressable, Text, View } from 'react-native'
 import { useFocusEffect, useRouter } from 'expo-router'
-import { surveyDrafts } from '../../../db'
-import type { SurveyDraft } from '../../../lib/surveyTypes'
-import { authStore } from '../../../lib/auth'
-import { syncStore } from '../../../lib/store'
-import { keepMyVersion, surveySyncEngine } from '../../../sync/surveySyncEngine'
-import { Button, Empty, Screen, StateBadge } from '../../../components/ui'
-import { colors, font, space } from '../../../theme'
+import { surveyDrafts } from '../db'
+import type { SurveyDraft } from '../lib/surveyTypes'
+import { authStore } from '../lib/auth'
+import { syncStore } from '../lib/store'
+import { keepMyVersion, surveySyncEngine } from '../sync/surveySyncEngine'
+import { Button, Empty, Screen, StateBadge } from '../components/ui'
+import { colors, font, space } from '../theme'
 
-export default function SurveyDraftsTab() {
+export function SurveyDrafts({ header }: { header?: ReactNode }) {
   const router = useRouter()
   const tick = syncStore.use(s => s.tick)
   const syncing = syncStore.use(s => s.syncing)
@@ -70,11 +70,11 @@ export default function SurveyDraftsTab() {
         />
       }
     >
-      <FlatList
+      <FlatList ListHeaderComponent={header ? <>{header}</> : undefined}
         data={list}
         keyExtractor={d => d.localId}
         ListEmptyComponent={
-          <Empty text="No site survey drafts on this phone. Tap 'Start New Site Survey' on the Home tab to begin." />
+          <Empty text="No site survey drafts on this phone. Tap 'Start New Site Survey' on the Surveys tab to begin." />
         }
         renderItem={({ item: d }) => (
           <Pressable

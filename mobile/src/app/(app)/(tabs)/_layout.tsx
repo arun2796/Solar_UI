@@ -1,5 +1,7 @@
 import { Tabs } from 'expo-router'
 import { Image, Text, View, type ColorValue } from 'react-native'
+import { useCan } from '../../../lib/auth'
+import { PERM } from '../../../lib/types'
 import { colors, headerOptions, space } from '../../../theme'
 
 const icon = (glyph: string) => ({ color }: { color: ColorValue }) => <Text style={{ fontSize: 24, color }}>{glyph}</Text>
@@ -16,15 +18,21 @@ function HeaderBrand() {
         />
       </View>
       <View>
-        <Text style={{ color: colors.onPrimary, fontWeight: '800', fontSize: 15 }} numberOfLines={1}>Solar PMC</Text>
+        <Text style={{ color: colors.onPrimary, fontWeight: '800', fontSize: 15 }} numberOfLines={1}>Shree Abhi Solar</Text>
         <Text style={{ color: colors.primarySoft, fontSize: 10, fontWeight: '600' }} numberOfLines={1}>Shree Abhi Electricals & Eng.</Text>
       </View>
     </View>
   )
 }
 
-/** The four bottom tabs. Client selection and report screens are stack screens above the tabs (see ../_layout.tsx). */
+/**
+ * Bottom tabs, by what the account may do (Settings > Roles & permissions in the admin website): Home for maintenance,
+ * Surveys for site surveys, both for people who do both. Client, report and survey screens are stack screens above the
+ * tabs (see ../_layout.tsx).
+ */
 export default function AppTabs() {
+  const canReports = useCan(PERM.reportsWork), canVisits = useCan(PERM.visitsView), canSurveys = useCan(PERM.surveysWork)
+  const maintenance = canReports || canVisits
   return <Tabs screenOptions={{
     tabBarActiveTintColor: colors.primary,
     tabBarInactiveTintColor: colors.muted,
@@ -33,7 +41,8 @@ export default function AppTabs() {
     headerTitle: () => <HeaderBrand />,
     ...headerOptions,
   }}>
-    <Tabs.Screen name="index" options={{ title: 'Home', tabBarIcon: icon('⌂') }} />
+    <Tabs.Screen name="index" options={{ title: 'Home', tabBarIcon: icon('⌂'), href: maintenance ? undefined : null }} />
+    <Tabs.Screen name="site-surveys" options={{ title: 'Surveys', tabBarIcon: icon('☀'), href: canSurveys ? undefined : null }} />
     <Tabs.Screen name="drafts" options={{ title: 'Drafts', tabBarIcon: icon('✎') }} />
     <Tabs.Screen name="history" options={{ title: 'History', tabBarIcon: icon('≣') }} />
     <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarIcon: icon('⚉') }} />

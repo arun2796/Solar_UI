@@ -10,13 +10,13 @@ import type { DraftSyncState } from '../db'
 function useSafeHeaderHeight() { try { return useHeaderHeight() } catch { return 0 } }
 
 /** Screen with keyboard avoidance (so remarks and date fields are not hidden by the keyboard) and an optional sticky footer. */
-export function Screen({ children, scroll = true, padded = true, footer, scrollEnabled = true, scrollRef }: {
-  children: ReactNode; scroll?: boolean; padded?: boolean; footer?: ReactNode; scrollEnabled?: boolean; scrollRef?: React.RefObject<any>
+export function Screen({ children, scroll = true, padded = true, footer, scrollEnabled = true, scrollRef, refreshControl }: {
+  children: ReactNode; scroll?: boolean; padded?: boolean; footer?: ReactNode; scrollEnabled?: boolean; scrollRef?: React.RefObject<any>; refreshControl?: React.ReactElement
 }) {
   const insets = useSafeAreaInsets()
   const headerHeight = useSafeHeaderHeight()
   const body = scroll
-    ? <ScrollView ref={scrollRef as never} contentContainerStyle={[padded && s.pad, { paddingBottom: space.xl }]} keyboardShouldPersistTaps="handled" scrollEnabled={scrollEnabled}>{children}</ScrollView>
+    ? <ScrollView ref={scrollRef as never} contentContainerStyle={[padded && s.pad, { paddingBottom: space.xl }]} keyboardShouldPersistTaps="handled" scrollEnabled={scrollEnabled} refreshControl={refreshControl}>{children}</ScrollView>
     : <View style={[{ flex: 1 }, padded && s.pad]}>{children}</View>
   return <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={headerHeight}>
     <ConnectionBanner />{body}
@@ -112,13 +112,35 @@ export function NotFound({ text = 'This draft is no longer on the device.', onBa
   return <Screen><Empty text={text} /><Button title="Go to Home" variant="secondary" onPress={onBack} /></Screen>
 }
 
-export function StateBadge({ state }: { state: DraftSyncState }) {
-  const map: Record<DraftSyncState, [string, string, string]> = {
-    local: ['Saved on phone', colors.warnSoft, colors.warn], syncing: ['Syncing', colors.infoSoft, colors.info], synced: ['Synced', colors.goodSoft, colors.good],
-    submitting: ['Submitting', colors.infoSoft, colors.info], submitted: ['Submitted', colors.goodSoft, colors.good], failed: ['Sync failed', colors.defectSoft, colors.defect],
-    conflict: ['Conflict', colors.defectSoft, colors.defect], elsewhere: ['Submitted elsewhere', colors.infoSoft, colors.info] }
-  const [t, bg, fg] = map[state]
-  return <View style={{ backgroundColor: bg, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 }}><Text style={{ color: fg, fontSize: 14, fontWeight: '800' }}>{t}</Text></View>
+/** Sync state of a local draft (report or survey), or a survey's server status. */
+export function StateBadge({ state }: { state?: string | null }) {
+  const map: Record<string, [string, string, string]> = {
+    assigned: ['Assigned', colors.primarySoft, colors.primaryDark],
+    local: ['Saved on phone', colors.warnSoft, colors.warn],
+    syncing: ['Syncing', colors.infoSoft, colors.info],
+    synced: ['Synced', colors.goodSoft, colors.good],
+    submitting: ['Submitting', colors.infoSoft, colors.info],
+    submitted: ['Submitted', colors.goodSoft, colors.good],
+    failed: ['Sync failed', colors.defectSoft, colors.defect],
+    conflict: ['Conflict', colors.defectSoft, colors.defect],
+    elsewhere: ['Submitted elsewhere', colors.infoSoft, colors.info],
+    completed: ['Completed', colors.goodSoft, colors.good],
+    in_review: ['In review', colors.infoSoft, colors.info],
+    draft: ['Draft', colors.warnSoft, colors.warn],
+    approved: ['Approved', colors.goodSoft, colors.good],
+    rejected: ['Rejected', colors.defectSoft, colors.defect],
+  }
+  const key = state ? String(state).toLowerCase() : 'local'
+  const [t, bg, fg] = map[key] || [
+    state ? String(state).replace('_', ' ') : 'Saved',
+    colors.infoSoft,
+    colors.info,
+  ]
+  return (
+    <View style={{ backgroundColor: bg, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 }}>
+      <Text style={{ color: fg, fontSize: 14, fontWeight: '800' }}>{t}</Text>
+    </View>
+  )
 }
 
 /** Section progress: numbered steps, ✓ when complete. With incomplete array, highlights incomplete sections in red tone. */

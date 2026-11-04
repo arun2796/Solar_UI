@@ -1,21 +1,23 @@
+import type { ReactNode } from 'react'
 import { FlatList, Pressable, Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
-import { api, errorMessage } from '../../../lib/api'
-import { Button, Empty, Loading, Screen, StateBadge } from '../../../components/ui'
-import { colors, font, space } from '../../../theme'
+import { api, errorMessage } from '../lib/api'
+import { Button, Empty, Loading, Screen, StateBadge } from '../components/ui'
+import { colors, font, space } from '../theme'
 
-export default function SurveyHistoryTab() {
+export function SurveyHistory({ header }: { header?: ReactNode }) {
   const router = useRouter()
   const q = useQuery({
     queryKey: ['surveys', 'history'],
     queryFn: () => api.surveys.list({ pageSize: 50 }),
   })
 
-  if (q.isLoading) return <Screen><Loading /></Screen>
+  if (q.isLoading) return <Screen>{header}<Loading /></Screen>
   if (q.isError) {
     return (
       <Screen>
+        {header}
         <Empty text={errorMessage(q.error)} />
         <Button title="Retry" variant="secondary" onPress={() => q.refetch()} />
       </Screen>
@@ -26,7 +28,7 @@ export default function SurveyHistoryTab() {
 
   return (
     <Screen scroll={false}>
-      <FlatList
+      <FlatList ListHeaderComponent={header ? <>{header}</> : undefined}
         data={items}
         keyExtractor={s => s.id}
         refreshing={q.isFetching}

@@ -214,15 +214,15 @@ export default function SurveyDashboard() {
       {/* KPI Stats */}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginBottom: space.lg }}>
         {stat('Total Surveys', (serverSurveys.data?.total ?? localSurveys.length), undefined, colors.primary)}
-        {stat('Active Drafts', drafts.length, () => router.push('/(app)/drafts'), drafts.length ? colors.warn : colors.text)}
-        {stat('Submitted', completed.length, () => router.push('/(app)/history'), colors.good)}
+        {stat('Active Drafts', drafts.length, () => router.push('/(app)/drafts?kind=surveys'), drafts.length ? colors.warn : colors.text)}
+        {stat('Submitted', completed.length, () => router.push('/(app)/history?kind=surveys'), colors.good)}
       </View>
 
       {/* Drafts in Progress */}
       <Card>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: space.sm }}>
           <Text style={{ fontWeight: '800', fontSize: font.large }}>Draft Surveys in Progress</Text>
-          <Pressable accessibilityRole="button" onPress={() => router.push('/(app)/drafts')}>
+          <Pressable accessibilityRole="button" onPress={() => router.push('/(app)/drafts?kind=surveys')}>
             <Text style={{ color: colors.primary, fontWeight: '700', fontSize: font.small }}>
               View all ({drafts.length}) →
             </Text>
@@ -266,7 +266,7 @@ export default function SurveyDashboard() {
       <Card>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: space.sm }}>
           <Text style={{ fontWeight: '800', fontSize: font.large }}>Recent Submitted Surveys</Text>
-          <Pressable accessibilityRole="button" onPress={() => router.push('/(app)/history')}>
+          <Pressable accessibilityRole="button" onPress={() => router.push('/(app)/history?kind=surveys')}>
             <Text style={{ color: colors.primary, fontWeight: '700', fontSize: font.small }}>
               History ({completed.length}) →
             </Text>

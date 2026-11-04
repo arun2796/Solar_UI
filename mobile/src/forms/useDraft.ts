@@ -7,17 +7,21 @@ import type { ReportFields } from '../lib/types'
 import { scheduleSync } from '../sync/engine'
 
 type DraftFlusher = () => Promise<void>
-let activeFlusher: DraftFlusher | null = null
+const activeFlushers = new Set<DraftFlusher>()
 
 export function registerActiveDraftFlusher(fn: DraftFlusher | null) {
-  activeFlusher = fn
+  if (fn) activeFlushers.add(fn)
+}
+
+export function unregisterActiveDraftFlusher(fn: DraftFlusher | null) {
+  if (fn) activeFlushers.delete(fn)
 }
 
 /** Flushes any open, unsaved in-memory draft directly to local SQLite storage. */
 export async function flushActiveDraft() {
-  if (activeFlusher) {
+  for (const fn of Array.from(activeFlushers)) {
     try {
-      await activeFlusher()
+      await fn()
     } catch {
       // ignore flush error on exit
     }
@@ -54,7 +58,7 @@ export function useDraft(localId: string) {
   // Register with global flusher so auto-logout saves any pending draft before signing out
   useEffect(() => {
     registerActiveDraftFlusher(flush)
-    return () => registerActiveDraftFlusher(null)
+    return () => unregisterActiveDraftFlusher(flush)
   }, [flush])
 
   // Sync state changes (synced, conflict, submitted…) must show up while the screen is open.

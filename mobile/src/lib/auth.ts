@@ -23,6 +23,8 @@ export const authStore = createStore<AuthState>({ status: 'loading', dev: false,
 
 /** Id of the signed-in user; drafts are owned by it. */
 export const currentUserId = () => authStore.get().userId
+/** Name shown on survey screens and PDFs (falls back to the email). */
+export const currentEngineerName = () => session?.user?.engineerName || session?.user?.email || 'Engineer'
 
 const META = 'solar_session_meta', ACCESS = 'solar_access_token', REFRESH = 'solar_refresh_token'
 const SKEW_MS = 30_000

@@ -6,7 +6,7 @@ import { api, errorMessage, problemOf } from '../../../lib/api'
 import { authStore, signOut } from '../../../lib/auth'
 import { config } from '../../../lib/config'
 import { syncStore } from '../../../lib/store'
-import { drafts } from '../../../db'
+import { drafts, surveyDrafts } from '../../../db'
 import { Button, Card, Field, Input, Row, Screen, Title } from '../../../components/ui'
 import { colors, font, space } from '../../../theme'
 
@@ -25,12 +25,12 @@ export default function Profile() {
     finally { setBusy(false) }
   }
   const logout = async () => {
-    const mine = owner ? await drafts.all(owner) : []
+    const mine = owner ? [...await drafts.all(owner), ...await surveyDrafts.all(owner)] : []
     if (mine.some(d => d.syncState === 'submitting')) {
-      Alert.alert('Submission in progress', 'A report is still being submitted. Stay signed in until it shows Submitted, otherwise it cannot finish.')
+      Alert.alert('Submission in progress', 'A report or survey is still being submitted. Stay signed in until it shows Submitted, otherwise it cannot finish.')
       return
     }
-    const unsynced = owner ? await drafts.countUnsynced(owner) : 0
+    const unsynced = owner ? await drafts.countUnsynced(owner) + await surveyDrafts.countUnsynced(owner) : 0
     Alert.alert('Sign out?', unsynced
       ? `${unsynced} draft(s) are NOT fully on the server. They stay on this phone, hidden from other users, and sync only after YOU sign in again.`
       : 'Your drafts stay on this phone.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Sign out', style: 'destructive', onPress: () => void signOut() }])

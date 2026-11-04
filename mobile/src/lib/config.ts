@@ -8,6 +8,7 @@ const OVERRIDE_KEY = 'solar_api_url_override'
 export const API_URL_EDITABLE = process.env.EXPO_PUBLIC_DEV_LOGIN === 'true'
 if (!BUILT_API_URL) console.warn('EXPO_PUBLIC_API_URL is not set; see .env.development')
 
+/** Read synchronously at start-up, so the very first request already uses it. Production builds never use an override. */
 function readOverride(): string | null {
   if (!API_URL_EDITABLE) return null
   try { return AsyncStorage.getItemSync(OVERRIDE_KEY) } catch { return null }
@@ -25,6 +26,8 @@ export function setApiUrl(input: string): string {
   let v = input.trim().replace(/\/+$/, '')
   if (!v) { AsyncStorage.removeItemSync(OVERRIDE_KEY); apiUrl = BUILT_API_URL; return apiUrl }
   if (!/^https?:\/\//i.test(v)) v = `http://${v}`
+  v = v.replace(/:(8081|8082|8083|8084)$/, ':5000')               // the Expo dev-server port typed by mistake
+  if (/^http:\/\/\d+\.\d+\.\d+\.\d+$/.test(v)) v = `${v}:5000`     // bare IP: the API's port
   apiUrl = v
   AsyncStorage.setItemSync(OVERRIDE_KEY, v)
   return apiUrl

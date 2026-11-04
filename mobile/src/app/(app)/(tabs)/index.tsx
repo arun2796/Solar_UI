@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import { Pressable, Text, View } from 'react-native'
-import { useFocusEffect, useRouter } from 'expo-router'
+import { Redirect, useFocusEffect, useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../../../lib/api'
 import { drafts, type Draft } from '../../../db'
@@ -10,7 +10,14 @@ import { fmtDate, PERM, type Appointment } from '../../../lib/types'
 import { Button, Card, Empty, Screen, StateBadge, Title } from '../../../components/ui'
 import { colors, font, space } from '../../../theme'
 
-export default function Dashboard() {
+/** Home is the maintenance dashboard; an account without maintenance work starts on Surveys instead. */
+export default function Home() {
+  const canReports = useCan(PERM.reportsWork), canVisits = useCan(PERM.visitsView)
+  const maintenance = canReports || canVisits
+  return maintenance ? <Dashboard /> : <Redirect href="/(app)/site-surveys" />
+}
+
+function Dashboard() {
   const router = useRouter()
   const owner = authStore.use(s => s.userId); const tick = syncStore.use(s => s.tick)
   // what the office allows this account (Settings > Roles & permissions); the API enforces the same

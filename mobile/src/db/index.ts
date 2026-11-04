@@ -176,3 +176,6 @@ export const meta = {
   async get(key: string) { return (await (await db()).getFirstAsync<{ value: string }>('select value from meta where key = ?', key))?.value ?? null },
   async set(key: string, value: string) { await (await db()).runAsync('insert or replace into meta (key, value) values (?, ?)', key, value) },
 }
+
+// Site surveys live in the same database (see ./surveys.ts).
+export * from './surveys'
