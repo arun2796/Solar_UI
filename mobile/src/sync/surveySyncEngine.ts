@@ -2,6 +2,7 @@ import { api, errorMessage, isNetworkError, statusOf } from '../lib/api'
 import { authStore, currentUserId, hasPermission } from '../lib/auth'
 import { PERM } from '../lib/types'
 import { surveyDrafts, surveysCache } from '../db'
+import { syncStore } from '../lib/store'
 import { shadowFreeSunHours, tariffRate } from '../lib/surveyCalculator'
 import { currentSurveySettings, refreshSurveySettings } from '../lib/surveySettings'
 import type { SurveyDraft, SurveyOverrides, SurveySections } from '../lib/surveyTypes'
@@ -188,6 +189,8 @@ export async function runSurveySync(): Promise<void> {
     if (left.some(d => d.syncState === 'submitting' || (d.syncState === 'local' && d.dirty === 1))) scheduleSurveySync(15_000)
   } finally {
     running = false
+    // Screens reload on the sync tick: a survey submitted offline then shows as sent (SV number, PDF and sharing).
+    syncStore.set(s => ({ tick: s.tick + 1 }))
   }
 }
 
