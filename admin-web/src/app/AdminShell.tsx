@@ -40,7 +40,7 @@ export function AdminGuard() {
 
   if (auth === 'out') return <Navigate to={`/login?from=${encodeURIComponent(location.pathname + location.search)}`} replace />
   if (me.isLoading) return <Splash />
-  if (me.isError || (me.data?.role !== 'admin' && me.data?.role !== 'management')) {
+  if (me.isError || me.data?.role !== 'admin') {
     const s = statusOf(me.error)
     const unreachable = me.isError && (s === undefined || s >= 500)
     return <div className="flex min-h-screen flex-col items-center justify-center gap-3 p-6 text-center">
@@ -55,20 +55,17 @@ export function AdminGuard() {
   return <Shell />
 }
 
-/** First page for a role: management only has Site Surveys. */
-const homeFor = (role?: Role) => (role === 'management' ? '/surveys' : '/')
-
-/** Layout route that refuses pages the signed-in role may not open (management: everything except Site Surveys). */
+/** Layout route that refuses pages the signed-in role may not open. */
 export function RequireRole({ roles }: { roles: Role[] }) {
   const role = useMe().data?.role
-  if (!role || !roles.includes(role)) return <Navigate to={homeFor(role)} replace />
+  if (!role || !roles.includes(role)) return <Navigate to="/" replace />
   return <Outlet />
 }
 
 const ADMIN: Role[] = ['admin']
 const nav: { to: string; label: string; icon: typeof Compass; end?: boolean; roles: Role[] }[] = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true, roles: ADMIN },
-  { to: '/surveys', label: 'Site Surveys', icon: Compass, roles: ['admin', 'management'] },
+  { to: '/surveys', label: 'Site Surveys', icon: Compass, roles: ADMIN },
   { to: '/reports', label: 'Reports', icon: FileText, roles: ADMIN },
   { to: '/clients', label: 'Clients', icon: Users, roles: ADMIN },
   { to: '/engineers', label: 'Engineers', icon: Wrench, roles: ADMIN },
@@ -93,7 +90,7 @@ function Shell() {
     {({ isActive }) => <><n.icon className={cx('h-4.5 w-4.5 shrink-0 transition-colors', isActive ? 'text-sky-700' : 'text-slate-400 group-hover:text-slate-600')} aria-hidden />{n.label}</>}</NavLink>)
   const devBadge = dev && <span className="rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 ring-1 ring-inset ring-amber-600/25">dev login</span>
   const email = me.data?.email ?? ''
-  const roleName = role === 'management' ? 'Management' : 'Admin'
+  const roleName = 'Admin'
   const avatar = <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-linear-to-br from-sky-600 to-sky-800 text-sm font-semibold uppercase text-white shadow-button">{email.slice(0, 1) || 'A'}</span>
   const signOutBtn = (cls: string) => <button type="button" onClick={doSignOut} className={cls}><LogOut className="h-4 w-4" aria-hidden />Sign out</button>
 

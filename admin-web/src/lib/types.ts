@@ -1,6 +1,6 @@
 // Mirrors backend/Application/Dtos/Dtos.cs (camelCase JSON)
 export type Paged<T> = { items: T[]; page: number; pageSize: number; total: number }
-export type Role = 'admin' | 'engineer' | 'site_engineer' | 'management'
+export type Role = 'admin' | 'engineer' | 'site_engineer'
 /** Roles that work in the field; what they may do follows their permissions. */
 export type FieldRole = 'engineer' | 'site_engineer'
 export type Me = { userId: string; role: Role; engineerId?: string | null; engineerName?: string | null; email?: string | null; permissions?: string[] }
@@ -99,7 +99,7 @@ export type SurveyDetail = {
   approvedForProposalAt?: string | null
 }
 
-/** Office / management discussion on a survey (never shown to engineers). */
+/** Office discussion on a survey (never shown to engineers). */
 export type SurveyComment = { id: string; surveyId: string; userId?: string | null; authorName: string; authorRole?: Role | null; body: string; createdAt: string }
 
 export type SurveyTaskCreate = {
@@ -136,9 +136,9 @@ export type Client = {
 }
 export type ClientUpsert = Omit<Client, 'id' | 'isActive' | 'createdAt' | 'updatedAt' | 'amcStatus'> & { amcStatus?: AmcStatus | null }
 
-/** Sign-in account. Admin and management accounts are managed on the Users page, engineers on the Engineers page. */
+/** Sign-in account. Admin accounts are managed on the Users page, engineers on the Engineers page. */
 export type AppUser = { id: string; name?: string | null; email?: string | null; role: Role; isActive: boolean; hasPassword: boolean; engineerId?: string | null; lastLoginAt?: string | null; createdAt: string }
-export type UserCreate = { name?: string | null; email: string; password: string; role: 'admin' | 'management' }
+export type UserCreate = { name?: string | null; email: string; password: string; role: 'admin' }
 
 export type Engineer = { id: string; name: string; phone?: string | null; email: string; employeeCode?: string | null; isActive: boolean; userId?: string | null; hasPassword?: boolean; createdAt: string; role: FieldRole; permissions: string[] }
 

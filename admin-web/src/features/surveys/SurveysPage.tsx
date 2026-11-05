@@ -14,7 +14,7 @@ export default function SurveysPage() {
   const [sp, setSp] = useSearchParams()
   const nav = useNavigate()
   const [createModalOpen, setCreateModalOpen] = useState(false)
-  const isAdmin = useRole() === 'admin'   // management: read-only list, no new tasks, export or engineer list
+  const isAdmin = useRole() === 'admin'
 
   const g = (k: string) => sp.get(k) ?? ''
   const set = (k: string, v: string) => {
@@ -85,7 +85,7 @@ export default function SurveysPage() {
     <>
       <PageHeader
         title="Site surveys"
-        subtitle={isAdmin ? 'Manage rooftop solar site feasibility surveys, task assignments, reviews and proposals' : 'Rooftop solar site feasibility surveys (read-only): open a survey to approve it for proposal or comment'}
+        subtitle="Manage rooftop solar site feasibility surveys, task assignments, reviews and proposals"
         actions={isAdmin &&
           <div className="flex gap-2">
             <Button onClick={() => setCreateModalOpen(true)}>

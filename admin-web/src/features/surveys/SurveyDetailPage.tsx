@@ -31,8 +31,8 @@ export default function SurveyDetailPage() {
   const nav = useNavigate()
   const qc = useQueryClient()
   const role = useRole()
-  const isAdmin = role === 'admin'   // management (MD): read-only, plus approve for proposal and comments
-  const canApprove = role === 'admin' || role === 'management'
+  const isAdmin = role === 'admin'
+  const canApprove = isAdmin
 
   const [reviewModalOpen, setReviewModalOpen] = useState(false)
   const [reassignModalOpen, setReassignModalOpen] = useState(false)
@@ -283,7 +283,7 @@ export default function SurveyDetailPage() {
           <div>
             <div className="font-bold">Approved for proposal</div>
             <p className="text-sm">
-              By <span className="font-semibold">{s.approvedForProposalByName || 'management'}</span> on {fmtDateTime(s.approvedForProposalAt)}
+              By <span className="font-semibold">{s.approvedForProposalByName || 'the office'}</span> on {fmtDateTime(s.approvedForProposalAt)}
             </p>
           </div>
         </div>
@@ -847,7 +847,7 @@ export default function SurveyDetailPage() {
         <Modal open={shareModalOpen} title="Share Site Survey Report" onClose={() => setShareModalOpen(false)}>
           <div className="space-y-4">
             <p className="text-sm text-slate-600">
-              This signed, secure link allows the customer or management to view and download the official PDF report without needing to sign in. The link is active for 7 days.
+              This signed, secure link allows the customer to view and download the official PDF report without needing to sign in. The link is active for 7 days.
             </p>
 
             <div className="flex items-center gap-2">

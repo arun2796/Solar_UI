@@ -228,7 +228,7 @@ function AccountSection() {
 function RolesSection() {
   const qc = useQueryClient()
   const q = useQuery({ queryKey: ['permissions'], queryFn: api.permissions.get })
-  const desc = 'Tick what each role may do in the mobile apps. The API enforces it; admin and management are not affected.'
+  const desc = 'Tick what each role may do in the mobile apps. The API enforces it; the admin is not affected.'
   if (q.isLoading) return <Panel title="Roles & permissions" desc={desc}><Skeleton rows={5} /></Panel>
   if (q.isError) return <Panel title="Roles & permissions" desc={desc}><ErrorState message={errorMessage(q.error)} onRetry={() => q.refetch()} /></Panel>
   // no key from the data: re-mounting after Save would drop the "Saved" message (the form compares with the new data anyway)

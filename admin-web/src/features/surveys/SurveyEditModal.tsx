@@ -760,7 +760,7 @@ export function SurveyEditModal({ open, onClose, survey, onUpdated }: SurveyEdit
                 rows={2}
                 value={recommendationNote}
                 onChange={e => setRecommendationNote(e.target.value)}
-                placeholder="Summary recommendation to management and client"
+                placeholder="Summary recommendation for the client"
               />
             </Field>
 

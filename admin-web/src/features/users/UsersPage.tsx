@@ -16,7 +16,7 @@ import { isFieldRole, ROLE_LABEL, ROLE_TONE } from '../../lib/roles'
 const createSchema = z.object({
   name: z.string().trim().max(200, 'At most 200 characters').optional().or(z.literal('')).transform(v => (v ? v : null)),
   email: z.string().trim().regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Enter a valid email').max(200, 'At most 200 characters'),
-  role: z.enum(['admin', 'management']),
+  role: z.literal('admin'),
   password: z.string().min(8, 'At least 8 characters').max(128, 'At most 128 characters'),
 })
 type CreateIn = z.input<typeof createSchema>
@@ -24,7 +24,7 @@ type CreateData = z.output<typeof createSchema>
 
 const label = (u: AppUser) => u.name || u.email || 'user'
 
-/** Office and management sign-ins. Engineers are listed with their role but managed on the Engineers page. */
+/** Office (admin) sign-ins. Engineers are listed with their role but managed on the Engineers page. */
 export default function UsersPage() {
   const qc = useQueryClient()
   const me = useMe()
@@ -44,7 +44,7 @@ export default function UsersPage() {
     <PageHeader title="Users" subtitle="Sign-in accounts and their role. Engineers are added on the Engineers page."
       actions={<Button onClick={() => { create.reset(); setCreating(true) }}><Plus className="h-4 w-4" aria-hidden />New user</Button>} />
     <Select aria-label="Role filter" value={roleFilter} onChange={e => setRoleFilter(e.target.value)} className="mb-3 w-56">
-      <option value="">All roles</option><option value="admin">Operations / admin</option><option value="management">Management (MD)</option><option value="engineer">Engineers</option><option value="site_engineer">Site engineers</option>
+      <option value="">All roles</option><option value="admin">Operations / admin</option><option value="engineer">Engineers</option><option value="site_engineer">Site engineers</option>
     </Select>
     {list.isLoading ? <Skeleton /> : list.isError ? <ErrorState message={errorMessage(list.error)} onRetry={() => list.refetch()} /> : rows.length === 0 ? <EmptyState text="No users." /> :
       <Table rows={rows} keyOf={u => u.id} cols={[
@@ -84,12 +84,12 @@ export default function UsersPage() {
 }
 
 function UserForm({ onSubmit, busy, error, onCancel }: { onSubmit: (d: CreateData) => void; busy: boolean; error: string | null; onCancel: () => void }) {
-  const { register, handleSubmit, formState: { errors } } = useForm<CreateIn, unknown, CreateData>({ resolver: zodResolver(createSchema), defaultValues: { role: 'management' } })
+  const { register, handleSubmit, formState: { errors } } = useForm<CreateIn, unknown, CreateData>({ resolver: zodResolver(createSchema), defaultValues: { role: 'admin' } })
   return <form onSubmit={handleSubmit(onSubmit)} className="space-y-3" noValidate>
     <Field label="Name" error={errors.name?.message}><Input {...register('name')} /></Field>
     <Field label="Email (login) *" error={errors.email?.message}><Input type="email" autoComplete="off" {...register('email')} /></Field>
-    <Field label="Role *" error={errors.role?.message} hint="Management sees Site Surveys only: read-only, with Approve for proposal and comments.">
-      <Select {...register('role')}><option value="management">Management (MD)</option><option value="admin">Operations / admin</option></Select></Field>
+    <input type="hidden" {...register('role')} />
+    <p className="text-sm text-slate-600">Role: <span className="font-medium text-slate-900">Operations / admin</span>. Engineers and site engineers are added on the Engineers page.</p>
     <Field label="Initial password *" error={errors.password?.message} hint="Share it privately. They can change it after signing in."><Input type="text" autoComplete="new-password" {...register('password')} /></Field>
     {error && <Notice>{error}</Notice>}
     <div className="flex justify-end gap-2"><Button variant="secondary" onClick={onCancel}>Cancel</Button><Button type="submit" loading={busy}>Create user</Button></div>

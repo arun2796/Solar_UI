@@ -8,16 +8,11 @@ export const router = createBrowserRouter([
   { path: '/reset-password', element: <Navigate to="/login" replace /> },   // old e-mailed reset links
   {
     path: '/', element: <AdminGuard />, children: [
-      // management (MD): Site Surveys only, read-only plus approve and comment
-      {
-        element: <RequireRole roles={['admin', 'management']} />, children: [
-          { path: 'surveys', element: <SurveysPage /> },
-          { path: 'surveys/:id', element: <SurveyDetailPage /> },
-        ],
-      },
       {
         element: <RequireRole roles={['admin']} />, children: [
           { index: true, element: <DashboardPage /> },
+          { path: 'surveys', element: <SurveysPage /> },
+          { path: 'surveys/:id', element: <SurveyDetailPage /> },
           { path: 'reports', element: <ReportsPage /> },
           { path: 'reports/:id', element: <ReportDetailPage /> },
           { path: 'clients', element: <ClientsPage /> },

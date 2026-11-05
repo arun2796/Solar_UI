@@ -270,7 +270,7 @@ export default function SurveySuccess() {
           }}
         >
           {sent
-            ? 'This survey is locked for editing. The Operations and Management teams have received the report for proposal review.'
+            ? 'This survey is locked for editing. The office has received the report for proposal review.'
             : 'This survey is locked for editing and saved on this phone. It is sent automatically as soon as there is a connection; the survey number appears here then.'}
         </Text>
       </View>

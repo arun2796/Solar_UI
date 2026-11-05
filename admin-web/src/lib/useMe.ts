@@ -10,7 +10,7 @@ export function useMe(enabled = true) {
   })
 }
 
-/** Role of the signed-in user (undefined while loading). Management sees Site Surveys only: read-only, plus approve and comment. */
+/** Role of the signed-in user (undefined while loading). */
 export function useRole(): Role | undefined {
   return useMe().data?.role
 }
